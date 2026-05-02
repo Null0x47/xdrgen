@@ -3,8 +3,8 @@ name: Daily model refresh
 # Re-runs `xdrgen update-models` once a day to pull the latest Defender XDR /
 # MDE table schemas from Azure-Sentinel. If anything changed, the regenerated
 # `./models/` is committed and a PR is opened, then immediately squash-merged
-# into main once the in-job lint + tests pass. If nothing changed, the run
-# exits cleanly without creating noise.
+# into main once the in-job tests pass. If nothing changed, the run exits
+# cleanly without creating noise.
 #
 # Manual triggers: use the "Run workflow" button (workflow_dispatch).
 
@@ -59,15 +59,10 @@ jobs:
 
       # Verify the regenerated tree before opening a PR. If upstream schema
       # changes break codegen assumptions or break a generator, fail loudly
-      # here rather than landing a broken main.
-      - name: Lint
-        if: steps.diff.outputs.changed == 'true'
-        run: uv run ruff check .
-
-      - name: Format check
-        if: steps.diff.outputs.changed == 'true'
-        run: uv run ruff format --check .
-
+      # here rather than landing a broken main. (Ruff is configured to skip
+      # `models/` via `tool.ruff.extend-exclude`, so model drift is validated
+      # by the test suite — which exercises every generator and therefore
+      # imports every model — rather than by lint/format checks.)
       - name: Tests
         if: steps.diff.outputs.changed == 'true'
         run: uv run pytest -q
@@ -83,9 +78,9 @@ jobs:
             Automated daily refresh of the Defender XDR / MDE Pydantic models
             from `Azure/Azure-Sentinel`'s `Tools/Solutions Analyzer/` CSVs.
 
-            Lint, format-check and the full test suite ran green against the
-            regenerated `./models/` before this PR was opened — see the
-            workflow run linked above for the full log.
+            The full test suite ran green against the regenerated `./models/`
+            before this PR was opened — see the workflow run linked above for
+            the full log.
           branch: chore/daily-model-refresh
           delete-branch: true
           base: main

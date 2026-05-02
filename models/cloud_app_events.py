@@ -6,136 +6,42 @@ from pydantic import BaseModel, Field
 
 
 class CloudAppEvents(BaseModel):
-    AccountDisplayName: Optional[str] = Field(
-        None,
-        description="Name displayed in the address book entry for the account user. This is usually a combination of the given name, middle initial, and surname of the user.",
-    )
-    AccountId: Optional[str] = Field(
-        None,
-        description="An identifier for the account as found by Microsoft Cloud App Security. Could be Azure Active Directory ID, user principal name, or other identifiers",
-    )
-    AccountObjectId: Optional[str] = Field(
-        None, description="Unique identifier for the account in Azure AD"
-    )
-    AccountType: Optional[str] = Field(
-        None,
-        description="Type of user account, indicating its general role and access levels, such as Regular, System, Admin, Application",
-    )
-    ActionType: Optional[str] = Field(
-        None, description="Type of activity that triggered the event"
-    )
-    ActivityObjects: Optional[Any] = Field(
-        None,
-        description="List of objects, such as files or folders, that were involved in the recorded activity",
-    )
-    ActivityType: Optional[str] = Field(
-        None, description="Type of activity that triggered the event"
-    )
-    AdditionalFields: Optional[Any] = Field(
-        None, description="Additional information about the entity or event"
-    )
-    AppInstanceId: Optional[int] = Field(
-        None, description="Unique identifier for the instance of an application"
-    )
-    Application: Optional[str] = Field(
-        None, description="Application that performed the recorded action"
-    )
-    ApplicationId: Optional[int] = Field(
-        None, description="Unique identifier for the application"
-    )
-    AuditSource: Optional[str] = Field(
-        None,
-        description="Cloud enviorment source of the cloud audit event. Cloud be Azure, AWS, GCP, AliCloud or other",
-    )
-    City: Optional[str] = Field(
-        None, description="City where the client IP address is geolocated"
-    )
-    CountryCode: Optional[str] = Field(
-        None,
-        description="Two-letter code indicating the country where the client IP address is geolocated",
-    )
-    DeviceType: Optional[str] = Field(
-        None,
-        description="Type of device based on purpose and functionality, such as network device, workstation, server, mobile, gaming console, or printer",
-    )
-    IPAddress: Optional[str] = Field(
-        None, description="IP address assigned to the device during communication"
-    )
-    IPCategory: Optional[str] = Field(
-        None, description="Additional information about the IP address"
-    )
-    IPTags: Optional[Any] = Field(
-        None,
-        description="Customer-defined information applied to specific IP addresses and IP address ranges",
-    )
-    IsAdminOperation: Optional[bool] = Field(
-        None,
-        description="Indicates whether the activity was performed by an administrator",
-    )
-    IsAnonymousProxy: Optional[bool] = Field(
-        None,
-        description="Indicates whether the IP address belongs to a known anonymous proxy",
-    )
-    IsExternalUser: Optional[bool] = Field(
-        None,
-        description="Indicates whether a user inside the network doesn't belong to the organization's domain",
-    )
-    IsImpersonated: Optional[bool] = Field(
-        None,
-        description="Indicates whether the activity was performed by one user for another (impersonated) user",
-    )
-    ISP: Optional[str] = Field(
-        None, description="Internet service provider associated with the IP address"
-    )
-    LastSeenForUser: Optional[Any] = Field(
-        None,
-        description="Number of days since each statistical feature for the user was last seen",
-    )
-    OAuthAppId: Optional[str] = Field(
-        None,
-        description="A unique identifier that's assigned to an application when it's registered to Entra with OAuth 2.0.",
-    )
-    ObjectId: Optional[str] = Field(
-        None,
-        description="Unique identifier of the object that the recorded action was applied to",
-    )
-    ObjectName: Optional[str] = Field(
-        None, description="Name of the object that the recorded action was applied to"
-    )
-    ObjectType: Optional[str] = Field(
-        None,
-        description="The type of object, such as a file or a folder, that the recorded action was applied to",
-    )
-    OSPlatform: Optional[str] = Field(
-        None,
-        description="Platform of the operating system running on the device. This indicates specific operating systems, including variations within the same family, such as Windows 10 and Windows 7",
-    )
-    RawEventData: Optional[Any] = Field(
-        None,
-        description="Raw event information from the source application or service in JSON format",
-    )
+    AccountDisplayName: Optional[str] = Field(None, description="Name displayed in the address book entry for the account user. This is usually a combination of the given name, middle initial, and surname of the user.")
+    AccountId: Optional[str] = Field(None, description="An identifier for the account as found by Microsoft Cloud App Security. Could be Azure Active Directory ID, user principal name, or other identifiers")
+    AccountObjectId: Optional[str] = Field(None, description="Unique identifier for the account in Azure AD")
+    AccountType: Optional[str] = Field(None, description="Type of user account, indicating its general role and access levels, such as Regular, System, Admin, Application")
+    ActionType: Optional[str] = Field(None, description="Type of activity that triggered the event")
+    ActivityObjects: Optional[Any] = Field(None, description="List of objects, such as files or folders, that were involved in the recorded activity")
+    ActivityType: Optional[str] = Field(None, description="Type of activity that triggered the event")
+    AdditionalFields: Optional[Any] = Field(None, description="Additional information about the entity or event")
+    AppInstanceId: Optional[int] = Field(None, description="Unique identifier for the instance of an application")
+    Application: Optional[str] = Field(None, description="Application that performed the recorded action")
+    ApplicationId: Optional[int] = Field(None, description="Unique identifier for the application")
+    AuditSource: Optional[str] = Field(None, description="Cloud enviorment source of the cloud audit event. Cloud be Azure, AWS, GCP, AliCloud or other")
+    City: Optional[str] = Field(None, description="City where the client IP address is geolocated")
+    CountryCode: Optional[str] = Field(None, description="Two-letter code indicating the country where the client IP address is geolocated")
+    DeviceType: Optional[str] = Field(None, description="Type of device based on purpose and functionality, such as network device, workstation, server, mobile, gaming console, or printer")
+    IPAddress: Optional[str] = Field(None, description="IP address assigned to the device during communication")
+    IPCategory: Optional[str] = Field(None, description="Additional information about the IP address")
+    IPTags: Optional[Any] = Field(None, description="Customer-defined information applied to specific IP addresses and IP address ranges")
+    IsAdminOperation: Optional[bool] = Field(None, description="Indicates whether the activity was performed by an administrator")
+    IsAnonymousProxy: Optional[bool] = Field(None, description="Indicates whether the IP address belongs to a known anonymous proxy")
+    IsExternalUser: Optional[bool] = Field(None, description="Indicates whether a user inside the network doesn't belong to the organization's domain")
+    IsImpersonated: Optional[bool] = Field(None, description="Indicates whether the activity was performed by one user for another (impersonated) user")
+    ISP: Optional[str] = Field(None, description="Internet service provider associated with the IP address")
+    LastSeenForUser: Optional[Any] = Field(None, description="Number of days since each statistical feature for the user was last seen")
+    OAuthAppId: Optional[str] = Field(None, description="A unique identifier that's assigned to an application when it's registered to Entra with OAuth 2.0.")
+    ObjectId: Optional[str] = Field(None, description="Unique identifier of the object that the recorded action was applied to")
+    ObjectName: Optional[str] = Field(None, description="Name of the object that the recorded action was applied to")
+    ObjectType: Optional[str] = Field(None, description="The type of object, such as a file or a folder, that the recorded action was applied to")
+    OSPlatform: Optional[str] = Field(None, description="Platform of the operating system running on the device. This indicates specific operating systems, including variations within the same family, such as Windows 10 and Windows 7")
+    RawEventData: Optional[Any] = Field(None, description="Raw event information from the source application or service in JSON format")
     ReportId: Optional[str] = Field(None, description="Unique identifier for the event")
-    SessionData: Optional[Any] = Field(
-        None, description="Session identifiers (if provided by the audit source)"
-    )
-    SourceSystem: Optional[str] = Field(
-        None,
-        description="The type of agent the event was collected by. For example,OpsManagerfor Windows agent, either direct connect or Operations Manager,Linuxfor all Linux agents, orAzurefor Azure Diagnostics",
-    )
+    SessionData: Optional[Any] = Field(None, description="Session identifiers (if provided by the audit source)")
+    SourceSystem: Optional[str] = Field(None, description="The type of agent the event was collected by. For example,OpsManagerfor Windows agent, either direct connect or Operations Manager,Linuxfor all Linux agents, orAzurefor Azure Diagnostics")
     TenantId: Optional[str] = Field(None, description="The Log Analytics workspace ID")
-    TimeGenerated: Optional[datetime] = Field(
-        None, description="Date and time (UTC) when the record was generated"
-    )
+    TimeGenerated: Optional[datetime] = Field(None, description="Date and time (UTC) when the record was generated")
     Type: Optional[str] = Field(None, description="The name of the table")
-    UncommonForUser: Optional[Any] = Field(
-        None,
-        description="List of features observed to be statistically uncommon for the user that performed the activity",
-    )
-    UserAgent: Optional[str] = Field(
-        None,
-        description="User agent information from the web browser or other client application",
-    )
-    UserAgentTags: Optional[Any] = Field(
-        None,
-        description="More information provided by Microsoft Defender for Cloud Apps in a tag in the user agent field. Can have any of the following values: Native client, Outdated browser, Outdated operating system, Robot",
-    )
+    UncommonForUser: Optional[Any] = Field(None, description="List of features observed to be statistically uncommon for the user that performed the activity")
+    UserAgent: Optional[str] = Field(None, description="User agent information from the web browser or other client application")
+    UserAgentTags: Optional[Any] = Field(None, description="More information provided by Microsoft Defender for Cloud Apps in a tag in the user agent field. Can have any of the following values: Native client, Outdated browser, Outdated operating system, Robot")

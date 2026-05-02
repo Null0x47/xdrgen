@@ -15,7 +15,15 @@ from pydantic import BaseModel, ValidationError
 from fetcher import fetch_schema_sources
 from model_codegen import generate_init_file, generate_model_file
 from parser import parse_xdr_table_names, parse_xdr_tables
-from generators import GENERATORS
+
+try:
+    from generators import GENERATORS
+except ImportError:
+    # Models package hasn't been generated yet — `update-models` will create it.
+    # Any command that actually needs generators (e.g. `generate`) will fail
+    # loudly downstream with a clearer "No generator for: ..." message.
+    GENERATORS: dict = {}
+
 from sinks import Sink
 from sinks import file as file_sink
 from sinks import kafka as kafka_sink

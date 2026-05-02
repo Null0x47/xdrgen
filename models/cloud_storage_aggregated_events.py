@@ -6,144 +6,47 @@ from pydantic import BaseModel, Field
 
 
 class CloudStorageAggregatedEvents(BaseModel):
-    DataAggregationStartTime: Optional[datetime] = Field(
-        None, description="The start time during which the data was aggregated"
-    )
-    DataAggregationEndTime: Optional[datetime] = Field(
-        None, description="The end time during which the data was aggregated"
-    )
-    DataSource: Optional[str] = Field(
-        None, description="The source of the aggregated logs"
-    )
-    SubscriptionId: Optional[str] = Field(
-        None, description="Unique identifier assigned to the Azure subscription"
-    )
-    ResourceGroup: Optional[str] = Field(
-        None, description="Name of the resource group where the storage account resides"
-    )
-    StorageAccount: Optional[str] = Field(
-        None, description="The identifier for the storage account"
-    )
-    StorageContainer: Optional[str] = Field(
-        None, description="The identifier for the storage container"
-    )
-    StorageFileShare: Optional[str] = Field(
-        None, description="The identifier for the storage file share"
-    )
-    ServiceType: Optional[str] = Field(
-        None,
-        description="Specifies the type of storage service (for example, Blob, ADLS Gen2, Files.REST, Files.SMB)",
-    )
-    IpAddress: Optional[str] = Field(
-        None, description="The IP addresses from which the storage was accessed"
-    )
-    UserAgentHeader: Optional[str] = Field(
-        None,
-        description="Details of the user agent accessing the storage (for example, browser or application)",
-    )
-    OperationNamesList: Optional[dict[str, Any]] = Field(
-        None,
-        description="A list of storage operations performed (for example, CreateContainer, DeleteContainer)",
-    )
-    AuthenticationType: Optional[str] = Field(
-        None,
-        description="The authentication method used to access the storage (for example, AccountKey, SAS, Oauth)",
-    )
-    AccountObjectId: Optional[str] = Field(
-        None,
-        description="The unique identifier of the object is making the storage access",
-    )
-    AccountTenantId: Optional[int] = Field(
-        None, description="The unique identifier of the Azure tenant"
-    )
-    AccountApplicationId: Optional[str] = Field(
-        None, description="The application ID associated with the storage access"
-    )
-    AccountUpn: Optional[str] = Field(
-        None, description="The user principal name of the accessing user"
-    )
+    DataAggregationStartTime: Optional[datetime] = Field(None, description="The start time during which the data was aggregated")
+    DataAggregationEndTime: Optional[datetime] = Field(None, description="The end time during which the data was aggregated")
+    DataSource: Optional[str] = Field(None, description="The source of the aggregated logs")
+    SubscriptionId: Optional[str] = Field(None, description="Unique identifier assigned to the Azure subscription")
+    ResourceGroup: Optional[str] = Field(None, description="Name of the resource group where the storage account resides")
+    StorageAccount: Optional[str] = Field(None, description="The identifier for the storage account")
+    StorageContainer: Optional[str] = Field(None, description="The identifier for the storage container")
+    StorageFileShare: Optional[str] = Field(None, description="The identifier for the storage file share")
+    ServiceType: Optional[str] = Field(None, description="Specifies the type of storage service (for example, Blob, ADLS Gen2, Files.REST, Files.SMB)")
+    IpAddress: Optional[str] = Field(None, description="The IP addresses from which the storage was accessed")
+    UserAgentHeader: Optional[str] = Field(None, description="Details of the user agent accessing the storage (for example, browser or application)")
+    OperationNamesList: Optional[dict[str, Any]] = Field(None, description="A list of storage operations performed (for example, CreateContainer, DeleteContainer)")
+    AuthenticationType: Optional[str] = Field(None, description="The authentication method used to access the storage (for example, AccountKey, SAS, Oauth)")
+    AccountObjectId: Optional[str] = Field(None, description="The unique identifier of the object is making the storage access")
+    AccountTenantId: Optional[int] = Field(None, description="The unique identifier of the Azure tenant")
+    AccountApplicationId: Optional[str] = Field(None, description="The application ID associated with the storage access")
+    AccountUpn: Optional[str] = Field(None, description="The user principal name of the accessing user")
     AccountType: Optional[int] = Field(None, description="The account type used")
-    OperationsCount: Optional[int] = Field(
-        None, description="The total number of storage operations performed"
-    )
-    SuccessfulOperationsCount: Optional[int] = Field(
-        None, description="The count of successful storage operations"
-    )
-    FailedOperationsCount: Optional[int] = Field(
-        None, description="The count of failed storage operations"
-    )
-    FirstEventTimestamp: Optional[datetime] = Field(
-        None,
-        description="The timestamp of the first observed operation in the aggregation period",
-    )
-    LastEventTimestamp: Optional[datetime] = Field(
-        None,
-        description="The timestamp of the last observed operation in the aggregation period",
-    )
-    TotalResponseLength: Optional[int] = Field(
-        None,
-        description="The total response length of all GET operations during the aggregation period",
-    )
-    SuccessfulReadOperations: Optional[int] = Field(
-        None, description="The count of successful read operations"
-    )
-    DistinctGetOperations: Optional[int] = Field(
-        None, description="The count of distinct GET operations performed"
-    )
-    AnonymousSuccessfulOperations: Optional[int] = Field(
-        None, description="The count of successful anonymous operations"
-    )
-    HasAnonymousResourceNotFoundFailures: Optional[bool] = Field(
-        None,
-        description="Indicates whether anonymous resource not found failures occurred",
-    )
-    CountryName: Optional[str] = Field(
-        None, description="The name of the country from where the storage was accessed"
-    )
-    CityName: Optional[str] = Field(
-        None, description="The name of the city from where the storage was accessed"
-    )
-    ProvinceName: Optional[str] = Field(
-        None,
-        description="The name of the province or state from where the storage was accessed",
-    )
-    ClientSystemServiceName: Optional[str] = Field(
-        None, description="The name of the system service is in the data center"
-    )
-    ClientCloudPlatformName: Optional[str] = Field(
-        None,
-        description="The name of the cloud platform where the data center is located",
-    )
-    IsTorExitNode: Optional[bool] = Field(
-        None, description="Indicates whether the IP address is a Tor exit node"
-    )
-    IsKnownSuspiciousIp: Optional[bool] = Field(
-        None, description="Indicates whether the IP address is known to be suspicious"
-    )
-    IsPrivateIp: Optional[bool] = Field(
-        None, description="Indicates whether the IP address is private"
-    )
-    SuspiciousUserAgentName: Optional[str] = Field(
-        None, description="The name of the suspicious user agent accessing the storage"
-    )
-    HashReputationMd5List: Optional[dict[str, Any]] = Field(
-        None, description="A list of MD5 hash reputations for the accessed resources"
-    )
-    AzureResourceId: Optional[str] = Field(
-        None, description="The Azure Resource ID of the storage account"
-    )
-    Location: Optional[str] = Field(
-        None, description="The location of the storage account (region)"
-    )
-    Timestamp: Optional[datetime] = Field(
-        None, description="Indicate the time when the record was generated"
-    )
-    ReportId: Optional[str] = Field(
-        None, description="GUID to identify the record in the specific table"
-    )
-    ActionType: Optional[str] = Field(
-        None, description="Type of action (aggregated logs)"
-    )
-    AdditionalFields: Optional[Any] = Field(
-        None, description="Additional information about the event in JSON array format"
-    )
+    OperationsCount: Optional[int] = Field(None, description="The total number of storage operations performed")
+    SuccessfulOperationsCount: Optional[int] = Field(None, description="The count of successful storage operations")
+    FailedOperationsCount: Optional[int] = Field(None, description="The count of failed storage operations")
+    FirstEventTimestamp: Optional[datetime] = Field(None, description="The timestamp of the first observed operation in the aggregation period")
+    LastEventTimestamp: Optional[datetime] = Field(None, description="The timestamp of the last observed operation in the aggregation period")
+    TotalResponseLength: Optional[int] = Field(None, description="The total response length of all GET operations during the aggregation period")
+    SuccessfulReadOperations: Optional[int] = Field(None, description="The count of successful read operations")
+    DistinctGetOperations: Optional[int] = Field(None, description="The count of distinct GET operations performed")
+    AnonymousSuccessfulOperations: Optional[int] = Field(None, description="The count of successful anonymous operations")
+    HasAnonymousResourceNotFoundFailures: Optional[bool] = Field(None, description="Indicates whether anonymous resource not found failures occurred")
+    CountryName: Optional[str] = Field(None, description="The name of the country from where the storage was accessed")
+    CityName: Optional[str] = Field(None, description="The name of the city from where the storage was accessed")
+    ProvinceName: Optional[str] = Field(None, description="The name of the province or state from where the storage was accessed")
+    ClientSystemServiceName: Optional[str] = Field(None, description="The name of the system service is in the data center")
+    ClientCloudPlatformName: Optional[str] = Field(None, description="The name of the cloud platform where the data center is located")
+    IsTorExitNode: Optional[bool] = Field(None, description="Indicates whether the IP address is a Tor exit node")
+    IsKnownSuspiciousIp: Optional[bool] = Field(None, description="Indicates whether the IP address is known to be suspicious")
+    IsPrivateIp: Optional[bool] = Field(None, description="Indicates whether the IP address is private")
+    SuspiciousUserAgentName: Optional[str] = Field(None, description="The name of the suspicious user agent accessing the storage")
+    HashReputationMd5List: Optional[dict[str, Any]] = Field(None, description="A list of MD5 hash reputations for the accessed resources")
+    AzureResourceId: Optional[str] = Field(None, description="The Azure Resource ID of the storage account")
+    Location: Optional[str] = Field(None, description="The location of the storage account (region)")
+    Timestamp: Optional[datetime] = Field(None, description="Indicate the time when the record was generated")
+    ReportId: Optional[str] = Field(None, description="GUID to identify the record in the specific table")
+    ActionType: Optional[str] = Field(None, description="Type of action (aggregated logs)")
+    AdditionalFields: Optional[Any] = Field(None, description="Additional information about the event in JSON array format")

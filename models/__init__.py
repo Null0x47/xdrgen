@@ -13,9 +13,7 @@ from .data_security_events import DataSecurityEvents
 from .device_app_crash import DeviceAppCrash
 from .device_app_launch import DeviceAppLaunch
 from .device_baseline_compliance_assessment import DeviceBaselineComplianceAssessment
-from .device_baseline_compliance_assessment_kb import (
-    DeviceBaselineComplianceAssessmentKB,
-)
+from .device_baseline_compliance_assessment_kb import DeviceBaselineComplianceAssessmentKB
 from .device_baseline_compliance_profiles import DeviceBaselineComplianceProfiles
 from .device_behavior_entities import DeviceBehaviorEntities
 from .device_behavior_info import DeviceBehaviorInfo
@@ -49,12 +47,8 @@ from .device_tvm_certificate_info import DeviceTvmCertificateInfo
 from .device_tvm_hardware_firmware import DeviceTvmHardwareFirmware
 from .device_tvm_info_gathering import DeviceTvmInfoGathering
 from .device_tvm_info_gathering_kb import DeviceTvmInfoGatheringKB
-from .device_tvm_secure_configuration_assessment import (
-    DeviceTvmSecureConfigurationAssessment,
-)
-from .device_tvm_secure_configuration_assessment_kb import (
-    DeviceTvmSecureConfigurationAssessmentKB,
-)
+from .device_tvm_secure_configuration_assessment import DeviceTvmSecureConfigurationAssessment
+from .device_tvm_secure_configuration_assessment_kb import DeviceTvmSecureConfigurationAssessmentKB
 from .device_tvm_software_evidence_beta import DeviceTvmSoftwareEvidenceBeta
 from .device_tvm_software_inventory import DeviceTvmSoftwareInventory
 from .device_tvm_software_vulnerabilities import DeviceTvmSoftwareVulnerabilities

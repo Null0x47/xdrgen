@@ -11,9 +11,6 @@ class DeviceSkypeSignIn(BaseModel):
     HealthServiceId: Optional[str] = Field(None, description="")
     Opcode: Optional[int] = Field(None, description="")
     ProviderId: Optional[str] = Field(None, description="")
-    SourceSystem: Optional[str] = Field(
-        None,
-        description="The type of agent the event was collected by. For example,OpsManagerfor Windows agent, either direct connect or Operations Manager,Linuxfor all Linux agents, orAzurefor Azure Diagnostics",
-    )
+    SourceSystem: Optional[str] = Field(None, description="The type of agent the event was collected by. For example,OpsManagerfor Windows agent, either direct connect or Operations Manager,Linuxfor all Linux agents, orAzurefor Azure Diagnostics")
     TimeGenerated: Optional[datetime] = Field(None, description="")
     Type: Optional[str] = Field(None, description="The name of the table")

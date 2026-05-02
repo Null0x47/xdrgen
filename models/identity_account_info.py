@@ -6,151 +6,49 @@ from pydantic import BaseModel, Field
 
 
 class IdentityAccountInfo(BaseModel):
-    Timestamp: Optional[datetime] = Field(
-        None,
-        description="The date and time that the line was written to the database.This is used when there are multiple lines for each identity, such as when a change is detected, or if 24 hours have passed since the last database line was added.",
-    )
+    Timestamp: Optional[datetime] = Field(None, description="The date and time that the line was written to the database.This is used when there are multiple lines for each identity, such as when a change is detected, or if 24 hours have passed since the last database line was added.")
     ReportId: Optional[str] = Field(None, description="Unique identifier for the event")
-    SourceProviderAccountId: Optional[str] = Field(
-        None,
-        description="Identifier for the account in the source provider (for example, object ID for a Microsoft Entra ID account)",
-    )
-    AccountId: Optional[str] = Field(
-        None, description="Internal identifier for the account"
-    )
-    IdentityId: Optional[str] = Field(
-        None, description="Identifier for the identity that the account is linked to"
-    )
-    IsPrimary: Optional[bool] = Field(
-        None,
-        description="Indicates if this account is considered as primary account for the linked identity",
-    )
-    IdentityLinkType: Optional[str] = Field(
-        None,
-        description="Type of linkage between the account and identity; possible values: Manual, Strong identifiers",
-    )
-    IdentityLinkReason: Optional[str] = Field(
-        None,
-        description="Reason for linking the account and identity. If the linkage type is manual, the value will be the justification comment added by the user.",
-    )
-    IdentityLinkTime: Optional[datetime] = Field(
-        None, description="Date and time the account was linked to the identity"
-    )
-    IdentityLinkBy: Optional[str] = Field(
-        None,
-        description="The entity that linked the account to the identity. If the linkage type is based on strong identifiers, the value will be System",
-    )
-    DisplayName: Optional[str] = Field(
-        None,
-        description="Name of the account user displayed in the address book. Typically a combination of a given or first name, a middle initial, and a last name or surname.",
-    )
-    AccountUpn: Optional[str] = Field(
-        None, description="User principal name (UPN) of the account"
-    )
+    SourceProviderAccountId: Optional[str] = Field(None, description="Identifier for the account in the source provider (for example, object ID for a Microsoft Entra ID account)")
+    AccountId: Optional[str] = Field(None, description="Internal identifier for the account")
+    IdentityId: Optional[str] = Field(None, description="Identifier for the identity that the account is linked to")
+    IsPrimary: Optional[bool] = Field(None, description="Indicates if this account is considered as primary account for the linked identity")
+    IdentityLinkType: Optional[str] = Field(None, description="Type of linkage between the account and identity; possible values: Manual, Strong identifiers")
+    IdentityLinkReason: Optional[str] = Field(None, description="Reason for linking the account and identity. If the linkage type is manual, the value will be the justification comment added by the user.")
+    IdentityLinkTime: Optional[datetime] = Field(None, description="Date and time the account was linked to the identity")
+    IdentityLinkBy: Optional[str] = Field(None, description="The entity that linked the account to the identity. If the linkage type is based on strong identifiers, the value will be System")
+    DisplayName: Optional[str] = Field(None, description="Name of the account user displayed in the address book. Typically a combination of a given or first name, a middle initial, and a last name or surname.")
+    AccountUpn: Optional[str] = Field(None, description="User principal name (UPN) of the account")
     EmailAddress: Optional[str] = Field(None, description="SMTP address of the account")
-    CriticalityLevel: Optional[int] = Field(
-        None, description="The criticality score of the account"
-    )
-    DefenderRiskLevel: Optional[int] = Field(
-        None,
-        description="The risk level of the account as calculated by Microsoft Defender",
-    )
-    DefenderRiskUpdateTime: Optional[datetime] = Field(
-        None,
-        description="Date and time Microsoft Defender last updated the risk level of the account",
-    )
-    Type: Optional[str] = Field(
-        None, description="Type of identity; possible values: User, ServiceAccount"
-    )
-    GivenName: Optional[str] = Field(
-        None, description="Given name or first name of the account user"
-    )
-    Surname: Optional[str] = Field(
-        None, description="Surname, family name, or last name of the account user"
-    )
-    EmployeeId: Optional[str] = Field(
-        None, description="Employee identifier assigned to the user by the organization"
-    )
-    Department: Optional[str] = Field(
-        None, description="Name of the department that the account user belongs to"
-    )
+    CriticalityLevel: Optional[int] = Field(None, description="The criticality score of the account")
+    DefenderRiskLevel: Optional[int] = Field(None, description="The risk level of the account as calculated by Microsoft Defender")
+    DefenderRiskUpdateTime: Optional[datetime] = Field(None, description="Date and time Microsoft Defender last updated the risk level of the account")
+    Type: Optional[str] = Field(None, description="Type of identity; possible values: User, ServiceAccount")
+    GivenName: Optional[str] = Field(None, description="Given name or first name of the account user")
+    Surname: Optional[str] = Field(None, description="Surname, family name, or last name of the account user")
+    EmployeeId: Optional[str] = Field(None, description="Employee identifier assigned to the user by the organization")
+    Department: Optional[str] = Field(None, description="Name of the department that the account user belongs to")
     JobTitle: Optional[str] = Field(None, description="Job title of the account user")
     Address: Optional[str] = Field(None, description="Address of the account user")
-    City: Optional[str] = Field(
-        None, description="City where the account user is located"
-    )
-    Country: Optional[str] = Field(
-        None, description="Country/Region where the account user is located"
-    )
-    Phone: Optional[str] = Field(
-        None, description="The listed phone number of the account user"
-    )
-    Manager: Optional[str] = Field(
-        None, description="The listed manager of the account user"
-    )
-    Sid: Optional[str] = Field(
-        None, description="Security identifier (SID) of the account"
-    )
-    AccountStatus: Optional[str] = Field(
-        None,
-        description="The status of the account; possible values: Disabled, Enabled, Deleted",
-    )
-    SourceProvider: Optional[str] = Field(
-        None,
-        description="Source application or service of the account (for example, Microsoft Entra ID)",
-    )
-    SourceProviderInstanceId: Optional[str] = Field(
-        None,
-        description="The identifier of the source application or service of the account. For example, in Microsoft Entra ID, this is the organization Globally Unique Identifier (GUID).",
-    )
-    SourceProviderInstanceDisplayName: Optional[str] = Field(
-        None,
-        description="The display name of the source application or service of the account",
-    )
-    AuthenticationMethod: Optional[str] = Field(
-        None,
-        description="Authentication method used to allow the account user to sign into the account; possible values: Credentials, Federated, Hybrid",
-    )
-    AuthenticationSourceAcccountId: Optional[str] = Field(
-        None,
-        description="The identifier of the federating account, if the authentication method is Federated",
-    )
-    EnrolledMfas: Optional[Any] = Field(
-        None,
-        description="Types of multifactor authentication methods configured for the account user and their status",
-    )
-    LastPasswordChangeTime: Optional[datetime] = Field(
-        None, description="Date and time the account password was last changed"
-    )
-    GroupMembership: Optional[Any] = Field(
-        None, description="Group identifiers assigned to the account"
-    )
-    AssignedRoles: Optional[Any] = Field(
-        None, description="Role identifiers assigned to the account"
-    )
-    EligibleRoles: Optional[Any] = Field(
-        None,
-        description="Identifiers for roles the account are eligible to use (for example, Microsoft Entra Privileged Identity Management roles)",
-    )
-    TenantMembershipType: Optional[str] = Field(
-        None, description="User type; possible values: Guest, Member"
-    )
-    CreatedDateTime: Optional[datetime] = Field(
-        None, description="Date and time when the user account was created"
-    )
-    DeletedDateTime: Optional[datetime] = Field(
-        None, description="Date and time when the user account was deleted"
-    )
-    Tags: Optional[Any] = Field(
-        None, description="Tags assigned to the account by Defender for Identity"
-    )
-    SourceProvderRiskLevel: Optional[Any] = Field(
-        None,
-        description="Risk level of the account as it appears in the source provider; possible values: Low, Medium, High",
-    )
-    AdditionalFields: Optional[Any] = Field(
-        None, description="Additional information about the entity or event"
-    )
-    TenantId: Optional[str] = Field(
-        None, description="Universally unique identifier (UUID) for the tenant"
-    )
+    City: Optional[str] = Field(None, description="City where the account user is located")
+    Country: Optional[str] = Field(None, description="Country/Region where the account user is located")
+    Phone: Optional[str] = Field(None, description="The listed phone number of the account user")
+    Manager: Optional[str] = Field(None, description="The listed manager of the account user")
+    Sid: Optional[str] = Field(None, description="Security identifier (SID) of the account")
+    AccountStatus: Optional[str] = Field(None, description="The status of the account; possible values: Disabled, Enabled, Deleted")
+    SourceProvider: Optional[str] = Field(None, description="Source application or service of the account (for example, Microsoft Entra ID)")
+    SourceProviderInstanceId: Optional[str] = Field(None, description="The identifier of the source application or service of the account. For example, in Microsoft Entra ID, this is the organization Globally Unique Identifier (GUID).")
+    SourceProviderInstanceDisplayName: Optional[str] = Field(None, description="The display name of the source application or service of the account")
+    AuthenticationMethod: Optional[str] = Field(None, description="Authentication method used to allow the account user to sign into the account; possible values: Credentials, Federated, Hybrid")
+    AuthenticationSourceAcccountId: Optional[str] = Field(None, description="The identifier of the federating account, if the authentication method is Federated")
+    EnrolledMfas: Optional[Any] = Field(None, description="Types of multifactor authentication methods configured for the account user and their status")
+    LastPasswordChangeTime: Optional[datetime] = Field(None, description="Date and time the account password was last changed")
+    GroupMembership: Optional[Any] = Field(None, description="Group identifiers assigned to the account")
+    AssignedRoles: Optional[Any] = Field(None, description="Role identifiers assigned to the account")
+    EligibleRoles: Optional[Any] = Field(None, description="Identifiers for roles the account are eligible to use (for example, Microsoft Entra Privileged Identity Management roles)")
+    TenantMembershipType: Optional[str] = Field(None, description="User type; possible values: Guest, Member")
+    CreatedDateTime: Optional[datetime] = Field(None, description="Date and time when the user account was created")
+    DeletedDateTime: Optional[datetime] = Field(None, description="Date and time when the user account was deleted")
+    Tags: Optional[Any] = Field(None, description="Tags assigned to the account by Defender for Identity")
+    SourceProvderRiskLevel: Optional[Any] = Field(None, description="Risk level of the account as it appears in the source provider; possible values: Low, Medium, High")
+    AdditionalFields: Optional[Any] = Field(None, description="Additional information about the entity or event")
+    TenantId: Optional[str] = Field(None, description="Universally unique identifier (UUID) for the tenant")

@@ -5,131 +5,40 @@ from pydantic import BaseModel, Field
 
 
 class DisruptionAndResponseEvents(BaseModel):
-    Timestamp: Optional[datetime] = Field(
-        None, description="Date and time when the event was recorded"
-    )
-    ActionType: Optional[str] = Field(
-        None,
-        description="Type of disruption action takenTip: For more information, seeActionType values.",
-    )
-    DeviceId: Optional[str] = Field(
-        None,
-        description="Unique identifier for the device that reported the event; the reporting device can be the one that blocked the access, the compromised device itself, or even a different device that is aware of the attack",
-    )
-    SourceDeviceId: Optional[str] = Field(
-        None,
-        description="Unique identifier for the device that the attack originated from",
-    )
-    TargetDeviceId: Optional[str] = Field(
-        None,
-        description="Unique identifier for the device that was targeted or attacked",
-    )
-    TargetDeviceName: Optional[str] = Field(
-        None, description="Name of the device that was targeted or attacked"
-    )
-    TargetDomainName: Optional[str] = Field(
-        None, description="Domain name of the device that was targeted or attacked"
-    )
-    DeviceName: Optional[str] = Field(
-        None,
-        description="Name of the device that reported the event; the reporting device can be the one that blocked the access, the compromised device itself, or even a different device that is aware of the attack",
-    )
-    DomainName: Optional[str] = Field(
-        None,
-        description="Domain name that the device that reported the event is joined to; the reporting device can be the one that blocked the access, the compromised device itself, or even a different device that is aware of the attack",
-    )
-    InitiatingProcessId: Optional[int] = Field(
-        None,
-        description="Process ID (PID) of the process that triggered that block action, based on the perspective of the reporting device",
-    )
-    InitiatingProcessFileName: Optional[str] = Field(
-        None,
-        description="Name of the process that triggered the block action, based on the perspective of the reporting device",
-    )
-    SourceUserSid: Optional[str] = Field(
-        None,
-        description="The security identifier of the account conducting the malicious activity",
-    )
-    SourceUserName: Optional[str] = Field(
-        None,
-        description="The user name of the account conducting the malicious activity",
-    )
-    SourceUserDomainName: Optional[str] = Field(
-        None,
-        description="The domain name of the account conducting the malicious activity",
-    )
-    SourceIpAddress: Optional[str] = Field(
-        None,
-        description="IP address where the attacker communication originated from and was blocked by automatic attack disruption",
-    )
-    SourcePort: Optional[int] = Field(
-        None, description="Port where the attacker communication originated from"
-    )
-    IpAddress: Optional[str] = Field(
-        None, description="IP address that the attacker attempted to access"
-    )
-    Port: Optional[str] = Field(
-        None, description="Port that the attacker attempted to access"
-    )
-    SourceDeviceName: Optional[str] = Field(
-        None, description="Host name of the device where the attack originated from"
-    )
-    SourceDomainName: Optional[str] = Field(
-        None, description="Domain name of the device where the attack originated from"
-    )
-    AuthenticationProtocol: Optional[str] = Field(
-        None,
-        description="Authentication protocol that the compromised user used to sign in; possible values: Undefined, NTLM, Kerberos",
-    )
-    Service: Optional[str] = Field(
-        None,
-        description="Name of the service the attacker attempted to use, if the attacker signed in using Kerberos or NTLM; for example: SMB, HTTP, cifs, SMB, host, ldap, SMB, krbtgt",
-    )
-    InterfaceUuid: Optional[str] = Field(
-        None,
-        description="Unique identifier (UUID) for the Remote Procedure Call (RPC) interface that the attacker attempted to access",
-    )
-    InterfaceFriendlyName: Optional[str] = Field(
-        None,
-        description="Friendly name of the interface represented by the interface UUID",
-    )
-    FileName: Optional[str] = Field(
-        None, description="Name of the file that the attacker attempted to access"
-    )
-    ShareName: Optional[str] = Field(
-        None,
-        description="Name of the share location that the attacker attempted to access",
-    )
-    LogonType: Optional[str] = Field(
-        None,
-        description="Type of logon session the user attempted; possible values: interactive, remote interactive (RDP), network, batch job, service",
-    )
-    LogonId: Optional[int] = Field(
-        None,
-        description="Identifier for a logon session; this is unique on the same device only between restarts",
-    )
-    SessionId: Optional[int] = Field(
-        None,
-        description="Unique number assigned to a user by a website's server for the duration of the visit or session",
-    )
-    CompromisedAccountCount: Optional[int] = Field(
-        None, description="Number of compromised accounts that are part of the policy"
-    )
-    PolicyId: Optional[str] = Field(
-        None, description="Unique identifier for the policy"
-    )
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
+    ActionType: Optional[str] = Field(None, description="Type of disruption action takenTip: For more information, seeActionType values.")
+    DeviceId: Optional[str] = Field(None, description="Unique identifier for the device that reported the event; the reporting device can be the one that blocked the access, the compromised device itself, or even a different device that is aware of the attack")
+    SourceDeviceId: Optional[str] = Field(None, description="Unique identifier for the device that the attack originated from")
+    TargetDeviceId: Optional[str] = Field(None, description="Unique identifier for the device that was targeted or attacked")
+    TargetDeviceName: Optional[str] = Field(None, description="Name of the device that was targeted or attacked")
+    TargetDomainName: Optional[str] = Field(None, description="Domain name of the device that was targeted or attacked")
+    DeviceName: Optional[str] = Field(None, description="Name of the device that reported the event; the reporting device can be the one that blocked the access, the compromised device itself, or even a different device that is aware of the attack")
+    DomainName: Optional[str] = Field(None, description="Domain name that the device that reported the event is joined to; the reporting device can be the one that blocked the access, the compromised device itself, or even a different device that is aware of the attack")
+    InitiatingProcessId: Optional[int] = Field(None, description="Process ID (PID) of the process that triggered that block action, based on the perspective of the reporting device")
+    InitiatingProcessFileName: Optional[str] = Field(None, description="Name of the process that triggered the block action, based on the perspective of the reporting device")
+    SourceUserSid: Optional[str] = Field(None, description="The security identifier of the account conducting the malicious activity")
+    SourceUserName: Optional[str] = Field(None, description="The user name of the account conducting the malicious activity")
+    SourceUserDomainName: Optional[str] = Field(None, description="The domain name of the account conducting the malicious activity")
+    SourceIpAddress: Optional[str] = Field(None, description="IP address where the attacker communication originated from and was blocked by automatic attack disruption")
+    SourcePort: Optional[int] = Field(None, description="Port where the attacker communication originated from")
+    IpAddress: Optional[str] = Field(None, description="IP address that the attacker attempted to access")
+    Port: Optional[str] = Field(None, description="Port that the attacker attempted to access")
+    SourceDeviceName: Optional[str] = Field(None, description="Host name of the device where the attack originated from")
+    SourceDomainName: Optional[str] = Field(None, description="Domain name of the device where the attack originated from")
+    AuthenticationProtocol: Optional[str] = Field(None, description="Authentication protocol that the compromised user used to sign in; possible values: Undefined, NTLM, Kerberos")
+    Service: Optional[str] = Field(None, description="Name of the service the attacker attempted to use, if the attacker signed in using Kerberos or NTLM; for example: SMB, HTTP, cifs, SMB, host, ldap, SMB, krbtgt")
+    InterfaceUuid: Optional[str] = Field(None, description="Unique identifier (UUID) for the Remote Procedure Call (RPC) interface that the attacker attempted to access")
+    InterfaceFriendlyName: Optional[str] = Field(None, description="Friendly name of the interface represented by the interface UUID")
+    FileName: Optional[str] = Field(None, description="Name of the file that the attacker attempted to access")
+    ShareName: Optional[str] = Field(None, description="Name of the share location that the attacker attempted to access")
+    LogonType: Optional[str] = Field(None, description="Type of logon session the user attempted; possible values: interactive, remote interactive (RDP), network, batch job, service")
+    LogonId: Optional[int] = Field(None, description="Identifier for a logon session; this is unique on the same device only between restarts")
+    SessionId: Optional[int] = Field(None, description="Unique number assigned to a user by a website's server for the duration of the visit or session")
+    CompromisedAccountCount: Optional[int] = Field(None, description="Number of compromised accounts that are part of the policy")
+    PolicyId: Optional[str] = Field(None, description="Unique identifier for the policy")
     PolicyName: Optional[str] = Field(None, description="Name of the policy")
     PolicyVersion: Optional[str] = Field(None, description="Version of the policy")
     PolicyHash: Optional[str] = Field(None, description="Unique hash of the policy")
-    DataSources: Optional[str] = Field(
-        None,
-        description="Products or services that provided information for the event; for example: Microsoft Defender for Endpoint",
-    )
-    IsPolicyOn: Optional[bool] = Field(
-        None,
-        description="Indicates the current state of the policy on the device at the time of the disruption event; possible values: true (the policy is on, therefore it was applied or enforced), false (the policy was turned off or revoked from the device)",
-    )
-    ReportType: Optional[str] = Field(
-        None,
-        description="The nature and impact level of the reported event; possible values: Prevented (the action, such as a connection or authentication attempt, was fully blocked before execution), Blocked (an active connection or session was forcibly terminated, with partial impact on the device), PolicyUpdated (the client received and possibly applied a new policy)",
-    )
+    DataSources: Optional[str] = Field(None, description="Products or services that provided information for the event; for example: Microsoft Defender for Endpoint")
+    IsPolicyOn: Optional[bool] = Field(None, description="Indicates the current state of the policy on the device at the time of the disruption event; possible values: true (the policy is on, therefore it was applied or enforced), false (the policy was turned off or revoked from the device)")
+    ReportType: Optional[str] = Field(None, description="The nature and impact level of the reported event; possible values: Prevented (the action, such as a connection or authentication attempt, was fully blocked before execution), Blocked (an active connection or session was forcibly terminated, with partial impact on the device), PolicyUpdated (the client received and possibly applied a new policy)")

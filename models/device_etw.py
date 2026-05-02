@@ -15,10 +15,7 @@ class DeviceEtw(BaseModel):
     ProcessId: Optional[str] = Field(None, description="")
     ProviderId: Optional[str] = Field(None, description="")
     SerialNumber: Optional[str] = Field(None, description="")
-    SourceSystem: Optional[str] = Field(
-        None,
-        description="The type of agent the event was collected by. For example,OpsManagerfor Windows agent, either direct connect or Operations Manager,Linuxfor all Linux agents, orAzurefor Azure Diagnostics",
-    )
+    SourceSystem: Optional[str] = Field(None, description="The type of agent the event was collected by. For example,OpsManagerfor Windows agent, either direct connect or Operations Manager,Linuxfor all Linux agents, orAzurefor Azure Diagnostics")
     status: Optional[int] = Field(None, description="")
     tags: Optional[str] = Field(None, description="")
     ThreadId: Optional[int] = Field(None, description="")
