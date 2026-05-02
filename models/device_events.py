@@ -18,6 +18,7 @@ class DeviceEvents(BaseModel):
     FileName: Optional[str] = Field(None, description="Domain of the account.")
     FileOriginIP: Optional[str] = Field(None, description="IP address where the file was downloaded from.")
     FileOriginUrl: Optional[str] = Field(None, description="URL where the file was downloaded from.")
+    FileSize: Optional[int] = Field(None, description="Size of the file in bytes.")
     FolderPath: Optional[str] = Field(None, description="Domain of the account.")
     InitiatingProcessAccountDomain: Optional[str] = Field(None, description="Domain of the account that ran the process responsible for the event.")
     InitiatingProcessAccountName: Optional[str] = Field(None, description="User name of the account that ran the process responsible for the event.")
