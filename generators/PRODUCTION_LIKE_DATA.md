@@ -1,0 +1,100 @@
+# Production-like data
+
+The generators are hand-curated per table to produce realistic, *correlated* values rather than random noise. A single immutable `World` object (defined in [`../world.py`](../world.py)) is built once per `xdrgen generate` run and threaded into every generator — that's how the world stays consistent across tables: a single tenant ID, the same user pool, the same IP-to-geo mapping, and user agents paired with their matching OS / browser. The same Avery Chen who downloads a file in `CloudAppEvents` is the same Avery Chen who interactively signs in via `EntraIdSignInEvents`, from the same set of source IPs.
+
+Generators self-register via a `@register("TableName")` decorator on their `generate(world)` function; [`__init__.py`](./__init__.py) walks the package with `pkgutil.iter_modules` at import time, so adding a new generator is a one-file change — drop a module under `generators/`, decorate, done.
+
+## Per-table specifics
+
+### `CloudAppEvents`
+
+- A curated catalogue of cloud apps with their real Defender for Cloud Apps `ApplicationId` values (Microsoft 365, Exchange Online, Teams, Salesforce, Box, GitHub) and the actual `ActionType` vocabulary each connector emits.
+- `ObjectId` / `ObjectName` / `ObjectType` and `ActivityObjects` are derived from the chosen `ActionType` (file actions get filenames, mail actions get message-IDs, account actions reference the acting user, etc.).
+- `RawEventData` mirrors source-side audit fields (`Operation`, `OrganizationId`, `RecordType`, `UserKey`, …) so the row matches the shape of a real Office 365 / Cloud App audit record.
+- `IsAdminOperation`, `IsExternalUser`, `IsAnonymousProxy` are derived from the picked entities, not random booleans.
+
+### `EntraIdSignInEvents`
+
+- `Application` / `ApplicationId` are picked from a pool of well-known first-party Microsoft client apps (Microsoft Office, Teams, Outlook Mobile, Authenticator, Edge, Azure CLI, Azure PowerShell, Azure Portal) using their real app IDs.
+- `ResourceDisplayName` / `ResourceId` are picked from a pool of resources users typically authenticate to (Microsoft Graph, Exchange Online, SharePoint, ARM, Teams Services, Office 365 Management APIs).
+- `ErrorCode` is weighted: ~80% success (`0`) with a long-tail of real Entra error codes (`50126` invalid credentials, `50076` MFA required, `50074` strong-auth interrupt, `53003` blocked by CA, `53000` device not compliant, `50053` account locked, `50158` external security challenge, `50140` KMSI interrupt, `50057` disabled, `50055` expired, `50034` unknown user, `50173` fresh token needed, `50097` device auth required). `AuthenticationProcessingDetails` carries the actual processor message tied to the error code on failures (e.g. `"InvalidUserNameOrPassword: Error validating credentials due to invalid username or password."`). The whole catalogue — codes, weights, descriptions — is overridable via `entra_sign_in_error_codes:` in YAML, so you can shape the distribution to a scenario (password-spray spike, CA rollout, etc.) without code changes.
+- `ConditionalAccessPolicies` is a JSON-encoded list of policy decisions; `ConditionalAccessStatus` is consistent with the policy results.
+- `LogonType`, `ClientAppUsed`, and `Browser` are derived from the picked user / user-agent (e.g. `nonInteractiveUser` for service accounts, `Mobile Apps and Desktop clients` for the iOS UA).
+- `DeviceName` / `EntraIdDeviceId` / `DeviceTrustType` / `IsManaged` / `IsCompliant` follow the user's primary registered device (with a probability of unmanaged sign-ins for users without a device).
+- `RiskLevelAggregated` / `RiskState` / `RiskDetails` are mostly clean (`0`); risk fields elevate together when failures occur.
+- `IsExternalUser` (`-1`/`0`/`1`), `IsGuestUser`, and `AlternateSignInName` follow Entra's actual semantics for cloud-only vs. hybrid vs. guest accounts.
+
+### `EntraIdSpnSignInEvents`
+
+- A pool of service principals modelling realistic shapes: production app SPNs, system-assigned managed identities (AKS), user-assigned managed identities (Functions), and CI/CD principals (GitHub Actions, Terraform Cloud).
+- `IsManagedIdentity` matches the SPN type. Managed identities are biased toward Azure cloud-provider source IPs (because that's where they actually run); regular SPNs come from anywhere in the IP pool.
+- `ResourceDisplayName` / `ResourceId` cover the resources SPNs typically hit (Microsoft Graph, ARM, Key Vault, Storage, SQL, Container Registry).
+- `ErrorCode` is weighted toward success (~92%) with realistic SPN failure modes (`7000215` invalid client secret, `7000222` expired secret keys, `700016` app not found, `50105` user not assigned to app role, `90094` admin consent required, `65001` consent missing, `53003` blocked by CA on the workload identity, `9002313` invalid grant). The catalogue is overridable via `entra_spn_sign_in_error_codes:` in YAML.
+
+### `GraphApiAuditEvents`
+
+- A curated catalogue of real Microsoft Graph endpoints across `Microsoft.DirectoryServices`, `Microsoft.Exchange`, `Microsoft.SharePoint`, `Microsoft.Teams`, `Microsoft.Reports`, and `Microsoft.Security`. Each endpoint pairs the URI template with the actual HTTP method and an OAuth scope appropriate for that call (e.g. `User.Read.All`, `Mail.Send`, `Policy.Read.All`).
+- `RequestUri` is rendered to a fully-formed `https://graph.microsoft.com/{v1.0|beta}/...` URL — `ApiVersion` matches the version embedded in the URI, and path placeholders are substituted from world fixtures (the calling user's `object_id` for `/users/{id}`, a directory group from `world.groups` for `/groups/{id}`) plus real-shaped GUIDs for SharePoint drives and Teams identifiers.
+- `EntityType` flips between `User` (delegated, user-context call — both `AccountObjectId` and `ServicePrincipalId` populated) and `ServicePrincipal` (app-only / `client_credentials` call — `AccountObjectId` empty, `ServicePrincipalId` and `ApplicationId` both equal to the calling app). Service-account users always go through the app-only path.
+- `IdentityProvider` resolves to `https://sts.windows.net/{tenantId}/`, picking up the tenant override from the YAML config. `IPAddress` and `Location` come from the world's IP / Azure-region pools.
+- `ResponseStatusCode` is weighted toward `200` (~80%) with the failure tail covering the codes a SOC analyst actually filters for: `401` invalid token, `403` insufficient scope, `404` target not found, `429` throttled, plus a small slice of `400` and `500`. `ResponseSize` tracks the outcome — large for `GET` reads, small for writes, exactly `0` for `204 No Content`, short for failures.
+
+### `IdentityLogonEvents` (Defender for Identity, on-prem AD)
+
+- `LogonType` is weighted toward `Network` (SMB share access) and `Interactive`, with realistic representation of `RemoteInteractive` (RDP), `Service`, `Batch`, `Unlock`, `NetworkCleartext`, and `CachedInteractive`.
+- `Protocol` and `DestinationPort` stay consistent — Kerberos → 88, NTLM → 445, LDAP → 389, LDAPS → 636. Service / batch logons skew toward Kerberos.
+- `DestinationDeviceName` / `DestinationIPAddress` always terminate at one of the configured domain controllers (`DC01.contoso.local`, `DC02.contoso.local`).
+- `AccountSid` uses a single shared SID prefix per tenant; per-user RIDs (`500` for the admin, regular RIDs for users, none for the federated guest) keep accounts identifiable across rows.
+- `FailureReason` is populated only when `ActionType == "LogonFailed"` (~8% of events) and uses MDI's actual vocabulary (`WrongPassword`, `AccountLockedOut`, `SmartcardRequired`, …).
+
+### `IdentityQueryEvents` (LDAP / SAMR / DNS recon against AD)
+
+- `QueryType` covers the BloodHound-style enumeration patterns SOC analysts actually look for: `QueryUser`, `QueryGroup`, `EnumerateUsers`, `EnumerateGroups`, `QueryComputer`, `QueryDomain`, `Resolve`.
+- `Query` is a real LDAP filter for LDAP queries (`(&(objectClass=user)(sAMAccountName=jordan.patel))`), an A-record lookup for DNS, etc.
+- `QueryTarget` is drawn from a real-world target pool (`Domain Admins`, `Enterprise Admins`, `Schema Admins`, tier-0 OU names, DC names) so the row exercises the same patterns detection rules trigger on.
+- `Protocol` ↔ `DestinationPort` are paired (`Ldap` → 389, `Samr` → 445, `Dns` → 53). User-scoped queries fill `TargetAccountDisplayName` / `TargetAccountUpn` from the same shared user pool.
+
+### `IdentityDirectoryEvents` (AD directory changes)
+
+- `ActionType` uses MDI's readable strings — group-membership churn and password resets dominate; rarer admin operations like `Account Constrained Delegation state changed`, `Service Principal Name added to account`, and `Account Sensitive flag changed` are present but thin.
+- Actor (`Account*`) and target (`TargetAccount*`) are independently sampled from the user pool, so admin-on-user, user-on-user, and self-modifications all appear.
+- All events terminate at a domain controller and use LDAP / port 389, matching the wire format MDI captures.
+
+### `IdentityEvents` (Sentinel unified identity table)
+
+- A different shape from the Defender-for-Identity tables: `ActionType` is the *raw* action string from the source application, not a normalised enum (`UserLoggedIn`, `Add member to group.`, `group.user_membership.add`, …).
+- `Application` covers both `AzureActiveDirectory` and federated sources (`Okta`); `ApplicationInstanceId` matches the source (`contoso.onmicrosoft.com` vs. `contoso.okta.com`).
+- `ActionResult` (`Success` / `Failure`) and `ActionFailureReason` are derived from the action type — anything containing `Failed` flips both consistently.
+- `TargetObjects` is a typed list (`user`, `group`, `application`, …) chosen to match the action.
+- `RawEventData` mirrors the activity-log shape Microsoft Graph / Okta would have produced for that operation.
+
+### `IdentityAccountInfo` (account / identity profile snapshot)
+
+- One row per account, sampled from the same shared user pool — display name, given/surname, department, job title, employee ID, city, country all stay consistent with that user across runs.
+- `Type` flips to `ServiceAccount` for the application user (no MFA enrolled, no manager); `Tags` carry `Sensitive` for admins, `Service Account` for SPNs, `Guest` for federated guests.
+- `CriticalityLevel` is `4` for admins and `2` otherwise. `DefenderRiskLevel` is weighted (`80%` clean, with a long tail).
+- `Sid` uses the same on-prem SID prefix as `IdentityLogonEvents` / `IdentityDirectoryEvents`, so the same account pivots cleanly between cloud-provider and on-prem rows.
+- `IdentityLinkType` / `IdentityLinkBy` model both the common `Strong identifiers` / `System` path and the rarer manual SOC-merge case.
+
+### `EmailEvents` / `EmailAttachmentInfo` / `EmailPostDeliveryEvents` / `EmailUrlInfo` / `UrlClickEvents` (correlated by `NetworkMessageId`)
+
+These five tables are the email side of Defender XDR and are designed to be **pivotable on `NetworkMessageId`** — given any one row, an analyst can join to every related row in the other four tables. To make that work, the generators all draw from a shared corpus ([`email_corpus.py`](./email_corpus.py)) of pre-built emails. Each pool entry carries everything any of the five tables needs: sender / recipient identities, attachments (with stable per-filename SHA-256s), embedded URLs, threat verdict, delivery action, and `NetworkMessageId` itself.
+
+The corpus covers a realistic mix:
+
+- routine vendor mail (Acme Billing, DocuSign) — clean, delivered to Inbox
+- platform notifications (GitHub PR, Microsoft Teams mention) — clean, no attachments
+- a phishing attempt from `securemail-update.io` — `Phish` threat type, blocked / quarantined, `SPF=fail; DKIM=none; DMARC=fail; CompAuth=fail`
+- a high-bulk newsletter — `BulkComplaintLevel=7`, `Junked`
+- an intra-org reply (Avery → Jordan) — `EmailDirection=Intra-org`, SharePoint URL
+- an outbound message from an admin to an external partner — `EmailDirection=Outbound`
+
+Per table:
+
+- **`EmailEvents`** — full email metadata including `AuthenticationDetails` (SPF / DKIM / DMARC / CompAuth pass-fail breakdown), `BulkComplaintLevel`, `ConfidenceLevel`, `DeliveryAction` / `DeliveryLocation`, `EmailAction` / `EmailActionPolicy`, `IsFirstContact`, `AttachmentCount` / `UrlCount` derived from the corpus.
+- **`EmailAttachmentInfo`** — one row per pulled attachment, with file name, extension, type, size, and a stable SHA-256 (so the same attachment hashes the same across runs).
+- **`EmailPostDeliveryEvents`** — ZAP / manual-remediation / user-reported-not-junk paths. When the underlying email already carries a phishing verdict, the action is forced to a ZAP or admin-triggered path (a user can't "Move to inbox" an email that was quarantined as phish).
+- **`EmailUrlInfo`** — one row per embedded URL, with `Url`, `UrlDomain`, and `UrlLocation` (Body / Subject / Attachment).
+- **`UrlClickEvents`** — Safe Links click telemetry. The clicker is always the email's recipient (joins on `(NetworkMessageId, AccountUpn)`); a click into a known-phish email is collapsed to a `Blockpage` / `ClickBlocked` / `BlockpageOverride` outcome regardless of the random outcome roll. `UrlChain` shows the realistic `safelinks.protection.outlook.com → tracker → final URL` shape.
+
+The full pool is small (8 emails) on purpose: with 5 generators sampling from it, mixed streams produce many rows-per-email so an analyst exploring the JSON output can practice pivoting on `NetworkMessageId` without first having to dig for matches.

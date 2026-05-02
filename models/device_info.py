@@ -1,0 +1,189 @@
+from datetime import datetime
+from typing import Any
+from typing import Optional
+
+from pydantic import BaseModel, Field
+
+
+class DeviceInfo(BaseModel):
+    AadDeviceId: Optional[str] = Field(
+        None, description="Unique identifier for the device in Azure Active Directory."
+    )
+    AdditionalFields: Optional[Any] = Field(
+        None, description="Additional information about the entity or event."
+    )
+    AssetValue: Optional[str] = Field(
+        None, description="Indicates the value of a device as assigned by the user."
+    )
+    AwsResourceName: Optional[str] = Field(
+        None,
+        description="Unique identifier of the AWS resource associated with the device.",
+    )
+    AzureResourceId: Optional[str] = Field(
+        None,
+        description="Unique identifier of the Azure resource associated with the device.",
+    )
+    AzureVmId: Optional[str] = Field(
+        None, description="Unique identifier assigned to the device in Azure."
+    )
+    AzureVmSubscriptionId: Optional[str] = Field(
+        None,
+        description="Unique identifier of the Azure subscription associated with the device.",
+    )
+    ClientVersion: Optional[str] = Field(
+        None,
+        description="Version of the endpoint agent or sensor running on the machine.",
+    )
+    CloudPlatforms: Optional[str] = Field(
+        None,
+        description="Thse cloud platforms that the device belongs to-can be Azure, Amazon Web Services, Google Cloud Platform and Azure Arc.",
+    )
+    DeviceCategory: Optional[str] = Field(
+        None,
+        description="Broader classification that groups certain device types under the following categories: Endpoint, Network device, IoT, Unknown.",
+    )
+    DeviceDynamicTags: Optional[str] = Field(
+        None,
+        description="Device tags added and removed dynamically based on dynamic rules.",
+    )
+    DeviceId: Optional[str] = Field(
+        None, description="Unique identifier for the device in the service."
+    )
+    DeviceManualTags: Optional[str] = Field(
+        None,
+        description="Device tags created manually using the portal UI or public API.",
+    )
+    DeviceName: Optional[str] = Field(
+        None, description="Fully qualified domain name (FQDN) of the device."
+    )
+    DeviceObjectId: Optional[str] = Field(
+        None, description="Unique identifier for the device in Azure AD."
+    )
+    DeviceSubtype: Optional[str] = Field(
+        None,
+        description="Additional modifier for certain types of devices, for example, a mobile device can be a tablet or a smartphone; only available if device discovery finds enough information about this attribute.",
+    )
+    DeviceType: Optional[str] = Field(
+        None,
+        description="Type of device based on purpose and functionality, such as network device, workstation, server, mobile, gaming console, or printer.",
+    )
+    ExclusionReason: Optional[str] = Field(
+        None, description="Indicates the reason for device exclusion."
+    )
+    ExposureLevel: Optional[str] = Field(
+        None, description="Indicates the exposure level of a device."
+    )
+    GcpFullResourceName: Optional[str] = Field(
+        None,
+        description="Unique identifier of the AWS resource associated with the device.",
+    )
+    HardwareUuid: Optional[str] = Field(
+        None,
+        description="Universally Unique Identifier (UUID) of the device's hardware.",
+    )
+    HostDeviceId: Optional[str] = Field(
+        None, description="Device ID of the device running Windows Subsystem for Linux."
+    )
+    IsAzureADJoined: Optional[bool] = Field(
+        None,
+        description="Boolean indicator of whether machine is joined to the Azure Active Directory.",
+    )
+    IsExcluded: Optional[bool] = Field(
+        None,
+        description="Determines if the device is currently excluded from Microsoft Defender for Vulnerability Management experiences.",
+    )
+    IsInternetFacing: Optional[bool] = Field(
+        None, description="Indicates whether the device is internet-facing."
+    )
+    IsTransient: Optional[bool] = Field(
+        None,
+        description="Indicates whether this device is classified as short-lived or transient based on the frequency of appearance of the device on the network.",
+    )
+    JoinType: Optional[str] = Field(
+        None, description="The device's Azure Active Directory join type."
+    )
+    LoggedOnUsers: Optional[Any] = Field(
+        None,
+        description="List of all users that are logged on the machine at the time of the event in JSON array format.",
+    )
+    MachineGroup: Optional[str] = Field(
+        None,
+        description="Machine group used to determine access to the machine and apply group-specific settings.",
+    )
+    MergedDeviceIds: Optional[str] = Field(
+        None,
+        description="Previous device IDs that have been assigned to the same device.",
+    )
+    MergedToDeviceId: Optional[str] = Field(
+        None, description="The most recent device ID assigned to a device."
+    )
+    MitigationStatus: Optional[str] = Field(
+        None, description="Indicates the mitigation action applied to a device."
+    )
+    Model: Optional[str] = Field(
+        None,
+        description="Model name or number of the product from the vendor or manufacturer, only available if device discovery finds enough information about this attribute.",
+    )
+    OnboardingStatus: Optional[str] = Field(
+        None,
+        description="Indicates whether the device is currently onboarded or not to Microsoft Defender for Endpoint or if the device is not supported.",
+    )
+    OSArchitecture: Optional[str] = Field(
+        None, description="Architecture of the operating system running on the machine."
+    )
+    OSBuild: Optional[int] = Field(
+        None,
+        description="Build version of the operating system running on the machine.",
+    )
+    OsBuildRevision: Optional[str] = Field(
+        None,
+        description="Build revision number of the operating system running on the machine.",
+    )
+    OSDistribution: Optional[str] = Field(
+        None,
+        description="Distribution of the OS platform, such as Ubuntu or RedHat for Linux platforms.",
+    )
+    OSPlatform: Optional[str] = Field(
+        None,
+        description="Platform of the operating system running on the machine. This indicates specific operating systems, including variations within the same family, such as Windows 10 and Windows 7.",
+    )
+    OSVersion: Optional[str] = Field(
+        None, description="Version of the operating system running on the machine."
+    )
+    OSVersionInfo: Optional[str] = Field(
+        None,
+        description="Additional information about the OS version, such as the popular name, code name, or version number.",
+    )
+    PublicIP: Optional[str] = Field(
+        None,
+        description="Public IP address used by the onboarded machine to connect to the Windows Defender ATP service. This could be the IP address of the machine itself, a NAT device, or a proxy.",
+    )
+    RegistryDeviceTag: Optional[str] = Field(
+        None, description="Device tag added through the registry."
+    )
+    ReportId: Optional[int] = Field(
+        None,
+        description="Event identifier based on a repeating counter. To identify unique events, this column must be used in conjunction with the ComputerName and EventTime columns..",
+    )
+    RestrictedDeviceSecurityOperations: Optional[str] = Field(
+        None,
+        description="The response categories that have been turned off on a device if its security operations settings is set to restricted. If the device's security operations settings is set to full operations, the value is null.",
+    )
+    SensorHealthState: Optional[str] = Field(
+        None,
+        description="Indicates health of the device's EDR sensor, if onboarded to Microsoft Defender For Endpoint.",
+    )
+    SourceSystem: Optional[str] = Field(
+        None,
+        description="The type of agent the event was collected by. For example,OpsManagerfor Windows agent, either direct connect or Operations Manager,Linuxfor all Linux agents, orAzurefor Azure Diagnostics",
+    )
+    TenantId: Optional[str] = Field(None, description="The Log Analytics workspace ID")
+    TimeGenerated: Optional[datetime] = Field(
+        None,
+        description="Date and time the event was recorded by the MDE agent on the endpoint.",
+    )
+    Type: Optional[str] = Field(None, description="The name of the table")
+    Vendor: Optional[str] = Field(
+        None,
+        description="Name of the product vendor or manufacturer, only available if device discovery finds enough information about this attribute.",
+    )

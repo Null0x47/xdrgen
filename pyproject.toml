@@ -1,0 +1,42 @@
+[project]
+name = "xdrgen"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "kafka-python>=2.3.1",
+    "pydantic>=2.13.3",
+    "pyyaml>=6.0.2",
+    "typer>=0.25.0",
+]
+
+[project.scripts]
+xdrgen = "main:main"
+
+[tool.uv]
+package = true
+
+[tool.setuptools]
+py-modules = ["main", "fetcher", "parser", "model_codegen", "world"]
+packages = ["models", "generators", "sinks"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+    "respx>=0.23.1",
+    "ruff>=0.15.12",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py312"
