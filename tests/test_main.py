@@ -13,7 +13,11 @@ from main import _load_profile, app
 
 @pytest.fixture
 def runner() -> CliRunner:
-    return CliRunner()
+    # GitHub Actions runners set COLUMNS=0, which makes Rich (used by Typer
+    # for error rendering) wrap long flag names like `--kafka-bootstrap`
+    # mid-word and break substring assertions on error output. Pin a wide
+    # width so error text stays on one line regardless of the host env.
+    return CliRunner(env={"COLUMNS": "200"})
 
 
 def test_load_profile_accepts_known_tables(tmp_path: pathlib.Path):
