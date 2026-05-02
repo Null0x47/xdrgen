@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 
 class DeviceNetworkInfo(BaseModel):
     ConnectedNetworks: Optional[Any] = Field(None, description="Networks that the adapter is connected to. Each JSON element in the array contains the network name, category (public, private or domain), a description, and a flag indicating if it is connected publicly to the internet.")
-    DefaultGateways: Optional[Any] = Field(None, description="Default gateway addresses in JSON array format.")
     DeviceId: Optional[str] = Field(None, description="Unique identifier for the device in the service.")
     DeviceName: Optional[str] = Field(None, description="Fully qualified domain name (FQDN) of the device.")
     DnsAddresses: Optional[Any] = Field(None, description="DNS server addresses in JSON array format.")
