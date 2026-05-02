@@ -1,0 +1,101 @@
+name: Daily model refresh
+
+# Re-runs `xdrgen update-models` once a day to pull the latest Defender XDR /
+# MDE table schemas from Azure-Sentinel. If anything changed, the regenerated
+# `./models/` is committed and a PR is opened, then immediately squash-merged
+# into main once the in-job lint + tests pass. If nothing changed, the run
+# exits cleanly without creating noise.
+#
+# Manual triggers: use the "Run workflow" button (workflow_dispatch).
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC daily
+  workflow_dispatch:
+
+# One refresh at a time — never let two scheduled runs race each other.
+concurrency:
+  group: update-models
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install project + dev deps
+        run: uv sync --all-groups
+
+      - name: Regenerate models from upstream schemas
+        run: uv run xdrgen update-models
+
+      - name: Detect drift
+        id: diff
+        run: |
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "Models already up to date — nothing to do."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Detected model drift:"
+            git status --short
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Verify the regenerated tree before opening a PR. If upstream schema
+      # changes break codegen assumptions or break a generator, fail loudly
+      # here rather than landing a broken main.
+      - name: Lint
+        if: steps.diff.outputs.changed == 'true'
+        run: uv run ruff check .
+
+      - name: Format check
+        if: steps.diff.outputs.changed == 'true'
+        run: uv run ruff format --check .
+
+      - name: Tests
+        if: steps.diff.outputs.changed == 'true'
+        run: uv run pytest -q
+
+      - name: Open pull request
+        if: steps.diff.outputs.changed == 'true'
+        id: cpr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore(models): refresh from Azure-Sentinel schema sources"
+          title: "chore(models): daily model refresh"
+          body: |
+            Automated daily refresh of the Defender XDR / MDE Pydantic models
+            from `Azure/Azure-Sentinel`'s `Tools/Solutions Analyzer/` CSVs.
+
+            Lint, format-check and the full test suite ran green against the
+            regenerated `./models/` before this PR was opened — see the
+            workflow run linked above for the full log.
+          branch: chore/daily-model-refresh
+          delete-branch: true
+          base: main
+          author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          committer: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+
+      - name: Squash-merge into main
+        if: steps.cpr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge --squash --delete-branch \
+            "${{ steps.cpr.outputs.pull-request-number }}"
