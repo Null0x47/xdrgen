@@ -6,6 +6,14 @@ import pytest
 
 from models import (
     CloudAppEvents,
+    DeviceEvents,
+    DeviceFileCertificateInfo,
+    DeviceImageLoadEvents,
+    DeviceLogonEvents,
+    DeviceNetworkEvents,
+    DeviceNetworkInfo,
+    DeviceProcessEvents,
+    DeviceRegistryEvents,
     EmailAttachmentInfo,
     EmailEvents,
     EmailPostDeliveryEvents,
@@ -22,6 +30,26 @@ from models import (
 )
 from generators import GENERATORS
 from generators.cloud_app_events import generate as generate_cae
+from generators.device_events import generate as generate_device_events
+from generators.device_file_certificate_info import (
+    generate as generate_device_cert,
+)
+from generators.device_image_load_events import (
+    generate as generate_device_image_load,
+)
+from generators.device_logon_events import generate as generate_device_logon
+from generators.device_network_events import (
+    generate as generate_device_network,
+)
+from generators.device_network_info import (
+    generate as generate_device_network_info,
+)
+from generators.device_process_events import (
+    generate as generate_device_process,
+)
+from generators.device_registry_events import (
+    generate as generate_device_registry,
+)
 from generators.email_attachment_info import generate as generate_email_attachment
 from generators.email_corpus import corpus_for
 from generators.email_events import generate as generate_email_events
@@ -90,6 +118,14 @@ def _world() -> World:
 def test_generators_registry_lists_every_supported_table():
     assert set(GENERATORS) == {
         "CloudAppEvents",
+        "DeviceEvents",
+        "DeviceFileCertificateInfo",
+        "DeviceImageLoadEvents",
+        "DeviceLogonEvents",
+        "DeviceNetworkEvents",
+        "DeviceNetworkInfo",
+        "DeviceProcessEvents",
+        "DeviceRegistryEvents",
         "EmailAttachmentInfo",
         "EmailEvents",
         "EmailPostDeliveryEvents",
@@ -807,6 +843,207 @@ def test_overrides_validates_user_shape():
 
     with pytest.raises(ValidationError):
         Overrides.model_validate({"users": [{"upn": "missing.fields@northwind.com"}]})
+
+
+def test_device_process_events_round_trips_through_model(_world):
+    event = generate_device_process(_world)
+
+    assert isinstance(event, DeviceProcessEvents)
+    DeviceProcessEvents.model_validate_json(event.model_dump_json(by_alias=True))
+
+
+def test_device_process_events_uses_a_known_device(_world):
+    device_ids = {d.device_id for d in _world.devices}
+    device_names = {d.device_name for d in _world.devices}
+    for _ in range(50):
+        event = generate_device_process(_world)
+        assert event.DeviceId in device_ids
+        assert event.DeviceName in device_names
+        assert event.TenantId == TENANT_ID
+        assert event.ActionType == "ProcessCreated"
+
+
+def test_device_logon_events_round_trips_through_model(_world):
+    event = generate_device_logon(_world)
+
+    assert isinstance(event, DeviceLogonEvents)
+    DeviceLogonEvents.model_validate_json(event.model_dump_json(by_alias=True))
+
+
+def test_device_logon_events_failure_reason_only_set_on_failure(_world):
+    saw_failure = False
+    for _ in range(500):
+        event = generate_device_logon(_world)
+        if event.ActionType == "LogonFailed":
+            saw_failure = True
+            assert event.FailureReason is not None
+        else:
+            assert event.ActionType == "LogonSuccess"
+            assert event.FailureReason is None
+    assert saw_failure, "expected at least one LogonFailed in 500 samples"
+
+
+def test_device_network_events_round_trips_through_model(_world):
+    event = generate_device_network(_world)
+
+    assert isinstance(event, DeviceNetworkEvents)
+    DeviceNetworkEvents.model_validate_json(event.model_dump_json(by_alias=True))
+
+
+def test_device_network_events_dns_uses_udp(_world):
+    """Protocol must agree with the destination port — port 53 → Udp."""
+    for _ in range(200):
+        event = generate_device_network(_world)
+        if event.RemotePort == 53:
+            assert event.Protocol == "Udp"
+
+
+def test_device_image_load_events_round_trips_through_model(_world):
+    event = generate_device_image_load(_world)
+
+    assert isinstance(event, DeviceImageLoadEvents)
+    DeviceImageLoadEvents.model_validate_json(event.model_dump_json(by_alias=True))
+
+
+def test_device_registry_events_round_trips_through_model(_world):
+    event = generate_device_registry(_world)
+
+    assert isinstance(event, DeviceRegistryEvents)
+    DeviceRegistryEvents.model_validate_json(event.model_dump_json(by_alias=True))
+
+
+def test_device_events_round_trips_through_model(_world):
+    event = generate_device_events(_world)
+
+    assert isinstance(event, DeviceEvents)
+    DeviceEvents.model_validate_json(event.model_dump_json(by_alias=True))
+
+
+def test_device_file_certificate_info_round_trips_through_model(_world):
+    event = generate_device_cert(_world)
+
+    assert isinstance(event, DeviceFileCertificateInfo)
+    DeviceFileCertificateInfo.model_validate_json(event.model_dump_json(by_alias=True))
+
+
+def test_device_file_certificate_info_unsigned_files_have_no_cert_fields(_world):
+    """When `IsSigned` is False the certificate-specific fields must clear —
+    a row that says "unsigned" but still has an Issuer is internally
+    inconsistent and would mislead a hunter pivoting on signer."""
+    saw_unsigned = False
+    for _ in range(500):
+        event = generate_device_cert(_world)
+        if event.IsSigned is False:
+            saw_unsigned = True
+            assert event.Issuer is None
+            assert event.Signer is None
+            assert event.CertificateSerialNumber is None
+    assert saw_unsigned, "expected at least one unsigned row in 500 samples"
+
+
+def test_device_network_info_round_trips_through_model(_world):
+    event = generate_device_network_info(_world)
+
+    assert isinstance(event, DeviceNetworkInfo)
+    DeviceNetworkInfo.model_validate_json(event.model_dump_json(by_alias=True))
+
+
+def test_device_network_info_ip_addresses_is_valid_json(_world):
+    """`IPAddresses` is documented as a JSON array — round-trip-decode it
+    so a downstream consumer can rely on the format."""
+    import json
+
+    for _ in range(50):
+        event = generate_device_network_info(_world)
+        parsed = json.loads(event.IPAddresses)
+        assert isinstance(parsed, list)
+        assert all("IPAddress" in entry for entry in parsed)
+
+
+def test_device_event_uses_primary_user_for_its_device(_world):
+    """`primary_user_upn` on a `Device` should bias the `InitiatingProcess`
+    account selection toward that user when the device fires events."""
+    primary_upns = {d.primary_user_upn for d in _world.devices if d.primary_user_upn}
+    saw_match = False
+    for _ in range(500):
+        event = generate_device_process(_world)
+        device_match = next(
+            (d for d in _world.devices if d.device_id == event.DeviceId), None
+        )
+        if (
+            device_match
+            and device_match.primary_user_upn
+            and event.InitiatingProcessAccountUpn == device_match.primary_user_upn
+        ):
+            saw_match = True
+    assert saw_match, (
+        "expected primary_user_upn to be picked for its own device in 500 samples"
+    )
+    assert primary_upns  # sanity: defaults still wire primary users
+
+
+def test_processes_override_constrains_initiating_process():
+    """A `processes:` override must fully replace the default catalogue —
+    every Device* event's InitiatingProcess fields should come from the
+    pinned process. Proves the process pool is profile-configurable."""
+    from world import Overrides, Process, Profile
+
+    only_proc = Process(
+        file_name="lab-runner.exe",
+        folder_path=r"C:\LAB",
+        company="Northwind Lab",
+        description="Lab Runner",
+        internal_file_name="lab-runner",
+        original_file_name="LAB-RUNNER.EXE",
+        product_name="Northwind Lab Tools",
+        product_version="1.2.3",
+        command_lines=("lab-runner.exe --once",),
+        integrity_level="High",
+        elevation="Full",
+        signature_status="Valid",
+        signer_type="ThirdParty",
+        parent="services.exe",
+    )
+    prof = Profile(
+        tables=["DeviceLogonEvents"],
+        overrides=Overrides(processes=[only_proc]),
+    )
+    world = prof.build_world()
+
+    assert len(world.processes) == 1
+    for _ in range(50):
+        event = generate_device_logon(world)
+        assert event.InitiatingProcessFileName == "lab-runner.exe"
+        assert event.InitiatingProcessCommandLine == "lab-runner.exe --once"
+        assert event.InitiatingProcessVersionInfoCompanyName == "Northwind Lab"
+        assert event.InitiatingProcessIntegrityLevel == "High"
+
+
+def test_devices_override_replaces_world_devices():
+    """A `devices:` override in the YAML must fully replace the default
+    pool — proves devices are profile-configurable."""
+    from world import Device, Overrides, Profile
+
+    only_device = Device(
+        device_id="ffffffff-aaaa-bbbb-cccc-111111111111",
+        device_name="WIN-LAB-ONLY.northwind.local",
+        os_platform="Windows11",
+        local_ip="10.99.0.5",
+        machine_group="Lab",
+        primary_user_upn=None,
+    )
+    prof = Profile(
+        tables=["DeviceProcessEvents"],
+        overrides=Overrides(devices=[only_device]),
+    )
+    world = prof.build_world()
+
+    assert len(world.devices) == 1
+    for _ in range(50):
+        event = generate_device_process(world)
+        assert event.DeviceId == only_device.device_id
+        assert event.DeviceName == only_device.device_name
+        assert event.MachineGroup == "Lab"
 
 
 @pytest.mark.parametrize("table", sorted(GENERATORS))

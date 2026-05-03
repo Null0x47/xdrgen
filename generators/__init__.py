@@ -15,7 +15,7 @@ import pkgutil
 from generators.base import GENERATORS as GENERATORS
 
 # Submodules that contain shared infrastructure rather than a generator.
-_SKIP = {"base", "common", "email_corpus"}
+_SKIP = {"base", "common", "device_common", "email_corpus"}
 
 for _info in pkgutil.iter_modules(__path__):
     _name = _info.name

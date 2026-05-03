@@ -32,6 +32,16 @@ tables:
   - IdentityLogonEvents
   - IdentityQueryEvents
 
+  # Defender for Endpoint (managed endpoints / MDE)
+  - DeviceEvents
+  - DeviceFileCertificateInfo
+  - DeviceImageLoadEvents
+  - DeviceLogonEvents
+  - DeviceNetworkEvents
+  - DeviceNetworkInfo
+  - DeviceProcessEvents
+  - DeviceRegistryEvents
+
   # Email + Safe Links (correlated by NetworkMessageId)
   - EmailEvents
   - EmailAttachmentInfo
@@ -77,6 +87,88 @@ overrides:
     - name: DC02.northwind.local
       ip: 10.10.0.11
       device_id: bbbb2222-3333-4444-5555-666666666666
+
+  # Managed endpoints reported on by Microsoft Defender for Endpoint.
+  # Drives every `Device*` table — DeviceEvents, DeviceProcessEvents,
+  # DeviceLogonEvents, DeviceNetworkEvents, DeviceImageLoadEvents,
+  # DeviceRegistryEvents, DeviceFileCertificateInfo, DeviceNetworkInfo.
+  # Required: device_id, device_name. Everything else is optional.
+  #
+  # `primary_user_upn` should match a `users[].upn` so the InitiatingProcess
+  # account on this device's events biases toward that user (~75% of the
+  # time). Omit it for shared / unattended endpoints (file servers, build
+  # boxes) so any user can show up.
+  devices:
+    - device_id: 7c2bd31c-2102-4ce7-93a0-2cf5e19b5a7d
+      device_name: WIN-AVERY-01.northwind.com
+      os_platform: Windows10
+      os_version: 10.0.19045.4291
+      public_ip: 20.43.122.12
+      local_ip: 10.10.20.41
+      mac_address: 00-15-5D-04-12-7A
+      machine_group: Engineering Workstations
+      primary_user_upn: avery.chen@northwind.com
+    - device_id: 9e4df53e-4324-4e09-b5c2-4e17f3bd7c9f
+      device_name: WIN-SAM-PAW.northwind.com
+      os_platform: Windows11
+      os_version: 10.0.22631.3737
+      public_ip: 73.62.18.101
+      local_ip: 10.10.30.5
+      mac_address: 00-15-5D-04-12-7B
+      machine_group: Tier-0 Privileged Access Workstations
+      primary_user_upn: sam.rivera@northwind.com
+    - device_id: be45cd61-1023-4ed0-9b1c-2e13ac55ff21
+      device_name: WIN-FILE-01.northwind.com
+      os_platform: WindowsServer2022
+      os_version: 10.0.20348.2402
+      public_ip: 20.43.122.12
+      local_ip: 10.10.50.10
+      mac_address: 00-15-5D-AA-33-15
+      machine_group: File Servers
+
+  # Initiating processes — the catalogue of binaries Defender for Endpoint
+  # surfaces as the *initiator* of an event (`InitiatingProcessFileName` and
+  # the related `InitiatingProcess*` columns on every Device* table).
+  # Each entry is one process with its real version-info, signing posture,
+  # and a list of typical command lines. Hashes (MD5/SHA1/SHA256) are
+  # derived deterministically from `file_name` at runtime; do not include
+  # them here.
+  #
+  # `integrity_level`: Untrusted | Low | Medium | High | System
+  # `elevation`: Default | Full | Limited
+  # `signer_type`: OsVendor | ThirdParty | Unknown
+  processes:
+    - file_name: explorer.exe
+      folder_path: C:\Windows
+      company: Microsoft Corporation
+      description: Windows Explorer
+      internal_file_name: explorer
+      original_file_name: EXPLORER.EXE
+      product_name: "Microsoft® Windows® Operating System"
+      product_version: 10.0.19041.4291
+      command_lines:
+        - C:\Windows\Explorer.EXE
+      integrity_level: Medium
+      elevation: Default
+      signature_status: Valid
+      signer_type: OsVendor
+      parent: userinit.exe
+    - file_name: powershell.exe
+      folder_path: C:\Windows\System32\WindowsPowerShell\v1.0
+      company: Microsoft Corporation
+      description: Windows PowerShell
+      internal_file_name: POWERSHELL
+      original_file_name: PowerShell.EXE.MUI
+      product_name: "Microsoft® Windows® Operating System"
+      product_version: 10.0.19041.3636
+      command_lines:
+        - powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\ProgramData\Scripts\northwind-deploy.ps1
+        - powershell.exe -Command Get-ADUser -Filter *
+      integrity_level: High
+      elevation: Full
+      signature_status: Valid
+      signer_type: OsVendor
+      parent: explorer.exe
 
   # Users / accounts that show up across every table. The first four fields
   # (display_name, upn, object_id, type) are required; everything else is

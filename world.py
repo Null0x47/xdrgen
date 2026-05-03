@@ -51,6 +51,55 @@ class DomainController(BaseModel):
     device_id: str
 
 
+class Process(BaseModel):
+    """An entry in the curated `InitiatingProcess*` catalogue used by the
+    Device* generators. Each row is one process Defender for Endpoint
+    surfaces as the initiator of an event — `cmd.exe`, `powershell.exe`,
+    `MsMpEng.exe`, … — paired with the version-info, signing posture,
+    typical command lines, and parent process the real binary carries.
+    Hashes are derived from `file_name` at runtime; supplying them in
+    YAML would be redundant."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    file_name: str
+    folder_path: str
+    company: str
+    description: str
+    internal_file_name: str
+    original_file_name: str
+    product_name: str
+    product_version: str
+    command_lines: tuple[str, ...]
+    integrity_level: str = "Medium"
+    elevation: str = "Default"
+    signature_status: str = "Valid"
+    signer_type: str = "OsVendor"
+    parent: str = "explorer.exe"
+
+
+class Device(BaseModel):
+    """A managed endpoint reported on by Microsoft Defender for Endpoint.
+
+    Drives every `Device*` table (`DeviceEvents`, `DeviceProcessEvents`,
+    `DeviceLogonEvents`, …). The fixture pool is intentionally separate from
+    `User.device_name` / `User.device_id` (which only stamp identity-side
+    rows) — endpoint events need richer context: OS platform, MAC, primary
+    local/public IP, machine group, and a back-link to the primary user."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    device_id: str
+    device_name: str
+    os_platform: str = "Windows10"
+    os_version: Optional[str] = None
+    public_ip: Optional[str] = None
+    local_ip: Optional[str] = None
+    mac_address: Optional[str] = None
+    machine_group: Optional[str] = None
+    primary_user_upn: Optional[str] = None
+
+
 class IPEntry(BaseModel):
     """A source IP paired with its geolocation. Real Defender events are
     enriched from the same IP-to-geo table, so City / State / Country / ISP /
@@ -138,6 +187,254 @@ _DEFAULT_DOMAIN_CONTROLLERS: tuple[DomainController, ...] = (
         name="DC02.contoso.local",
         ip="10.0.0.11",
         device_id="22223333-4444-5555-6666-777788889999",
+    ),
+)
+
+
+_DEFAULT_PROCESSES: tuple[Process, ...] = (
+    Process(
+        file_name="explorer.exe",
+        folder_path=r"C:\Windows",
+        company="Microsoft Corporation",
+        description="Windows Explorer",
+        internal_file_name="explorer",
+        original_file_name="EXPLORER.EXE",
+        product_name="Microsoft® Windows® Operating System",
+        product_version="10.0.19041.4291",
+        command_lines=(r"C:\Windows\Explorer.EXE",),
+        integrity_level="Medium",
+        elevation="Default",
+        signature_status="Valid",
+        signer_type="OsVendor",
+        parent="userinit.exe",
+    ),
+    Process(
+        file_name="cmd.exe",
+        folder_path=r"C:\Windows\System32",
+        company="Microsoft Corporation",
+        description="Windows Command Processor",
+        internal_file_name="cmd",
+        original_file_name="Cmd.Exe",
+        product_name="Microsoft® Windows® Operating System",
+        product_version="10.0.19041.3636",
+        command_lines=(
+            r"cmd.exe /c whoami",
+            r"cmd.exe /c ipconfig /all",
+            r"cmd.exe /c net localgroup administrators",
+        ),
+        integrity_level="Medium",
+        elevation="Default",
+        signature_status="Valid",
+        signer_type="OsVendor",
+        parent="explorer.exe",
+    ),
+    Process(
+        file_name="powershell.exe",
+        folder_path=r"C:\Windows\System32\WindowsPowerShell\v1.0",
+        company="Microsoft Corporation",
+        description="Windows PowerShell",
+        internal_file_name="POWERSHELL",
+        original_file_name="PowerShell.EXE.MUI",
+        product_name="Microsoft® Windows® Operating System",
+        product_version="10.0.19041.3636",
+        command_lines=(
+            r"powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\ProgramData\Scripts\update.ps1",
+            r"powershell.exe -Command Get-ADUser -Filter *",
+            r"powershell.exe -Command Invoke-WebRequest -Uri https://internal.contoso.com/feed",
+        ),
+        integrity_level="High",
+        elevation="Full",
+        signature_status="Valid",
+        signer_type="OsVendor",
+        parent="explorer.exe",
+    ),
+    Process(
+        file_name="svchost.exe",
+        folder_path=r"C:\Windows\System32",
+        company="Microsoft Corporation",
+        description="Host Process for Windows Services",
+        internal_file_name="svchost.exe",
+        original_file_name="svchost.exe",
+        product_name="Microsoft® Windows® Operating System",
+        product_version="10.0.19041.3636",
+        command_lines=(
+            r"C:\WINDOWS\system32\svchost.exe -k netsvcs -p",
+            r"C:\WINDOWS\system32\svchost.exe -k LocalServiceNetworkRestricted -p",
+        ),
+        integrity_level="System",
+        elevation="Full",
+        signature_status="Valid",
+        signer_type="OsVendor",
+        parent="services.exe",
+    ),
+    Process(
+        file_name="chrome.exe",
+        folder_path=r"C:\Program Files\Google\Chrome\Application",
+        company="Google LLC",
+        description="Google Chrome",
+        internal_file_name="chrome_exe",
+        original_file_name="chrome.exe",
+        product_name="Google Chrome",
+        product_version="127.0.6533.100",
+        command_lines=(
+            r'"C:\Program Files\Google\Chrome\Application\chrome.exe"',
+            r'"C:\Program Files\Google\Chrome\Application\chrome.exe" --type=renderer',
+        ),
+        integrity_level="Low",
+        elevation="Default",
+        signature_status="Valid",
+        signer_type="ThirdParty",
+        parent="explorer.exe",
+    ),
+    Process(
+        file_name="msedge.exe",
+        folder_path=r"C:\Program Files (x86)\Microsoft\Edge\Application",
+        company="Microsoft Corporation",
+        description="Microsoft Edge",
+        internal_file_name="msedge_exe",
+        original_file_name="msedge.exe",
+        product_name="Microsoft Edge",
+        product_version="126.0.2592.113",
+        command_lines=(
+            r'"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"',
+        ),
+        integrity_level="Low",
+        elevation="Default",
+        signature_status="Valid",
+        signer_type="OsVendor",
+        parent="explorer.exe",
+    ),
+    Process(
+        file_name="outlook.exe",
+        folder_path=r"C:\Program Files\Microsoft Office\root\Office16",
+        company="Microsoft Corporation",
+        description="Microsoft Outlook",
+        internal_file_name="Outlook",
+        original_file_name="OUTLOOK.EXE",
+        product_name="Microsoft Office",
+        product_version="16.0.17328.20184",
+        command_lines=(
+            r'"C:\Program Files\Microsoft Office\root\Office16\OUTLOOK.EXE"',
+        ),
+        integrity_level="Medium",
+        elevation="Default",
+        signature_status="Valid",
+        signer_type="OsVendor",
+        parent="explorer.exe",
+    ),
+    Process(
+        file_name="winword.exe",
+        folder_path=r"C:\Program Files\Microsoft Office\root\Office16",
+        company="Microsoft Corporation",
+        description="Microsoft Word",
+        internal_file_name="Word",
+        original_file_name="WinWord.exe",
+        product_name="Microsoft Office",
+        product_version="16.0.17328.20184",
+        command_lines=(
+            r'"C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE" /n',
+        ),
+        integrity_level="Medium",
+        elevation="Default",
+        signature_status="Valid",
+        signer_type="OsVendor",
+        parent="explorer.exe",
+    ),
+    Process(
+        file_name="MsMpEng.exe",
+        folder_path=r"C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.24050.7-0",
+        company="Microsoft Corporation",
+        description="Antimalware Service Executable",
+        internal_file_name="MsMpEng",
+        original_file_name="MsMpEng.exe",
+        product_name="Microsoft® Windows® Operating System",
+        product_version="4.18.24050.7",
+        command_lines=(
+            r'"C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.24050.7-0\MsMpEng.exe"',
+        ),
+        integrity_level="System",
+        elevation="Full",
+        signature_status="Valid",
+        signer_type="OsVendor",
+        parent="services.exe",
+    ),
+    Process(
+        file_name="rundll32.exe",
+        folder_path=r"C:\Windows\System32",
+        company="Microsoft Corporation",
+        description="Windows host process (Rundll32)",
+        internal_file_name="rundll",
+        original_file_name="RUNDLL32.EXE",
+        product_name="Microsoft® Windows® Operating System",
+        product_version="10.0.19041.3636",
+        command_lines=(
+            r"rundll32.exe shell32.dll,Control_RunDLL",
+            r"rundll32.exe printui.dll,PrintUIEntry /Xg /n \\printsrv\HR-LJ4",
+        ),
+        integrity_level="Medium",
+        elevation="Default",
+        signature_status="Valid",
+        signer_type="OsVendor",
+        parent="explorer.exe",
+    ),
+)
+
+
+_DEFAULT_DEVICES: tuple[Device, ...] = (
+    Device(
+        device_id="7c2bd31c-2102-4ce7-93a0-2cf5e19b5a7d",
+        device_name="WIN-AVERY-01.contoso.com",
+        os_platform="Windows10",
+        os_version="10.0.19045.4291",
+        public_ip="20.43.122.12",
+        local_ip="10.10.20.41",
+        mac_address="00-15-5D-04-12-7A",
+        machine_group="Engineering Workstations",
+        primary_user_upn="avery.chen@contoso.com",
+    ),
+    Device(
+        device_id="8d3ce42d-3213-4df8-a4b1-3d06f2ac6b8e",
+        device_name="MAC-JORDAN-02.contoso.com",
+        os_platform="macOS",
+        os_version="14.5",
+        public_ip="52.114.6.45",
+        local_ip="10.10.20.42",
+        mac_address="A4-83-E7-2D-9C-11",
+        machine_group="Finance Workstations",
+        primary_user_upn="jordan.patel@contoso.com",
+    ),
+    Device(
+        device_id="9e4df53e-4324-4e09-b5c2-4e17f3bd7c9f",
+        device_name="WIN-SAM-PAW.contoso.com",
+        os_platform="Windows11",
+        os_version="10.0.22631.3737",
+        public_ip="73.62.18.101",
+        local_ip="10.10.30.5",
+        mac_address="00-15-5D-04-12-7B",
+        machine_group="Tier-0 Privileged Access Workstations",
+        primary_user_upn="sam.rivera@contoso.com",
+    ),
+    Device(
+        device_id="ad34af50-9012-4cdf-9a3b-1f02bc44ee10",
+        device_name="LIN-BUILD-01.contoso.com",
+        os_platform="Linux",
+        os_version="Ubuntu 22.04.4 LTS",
+        public_ip="20.43.122.12",
+        local_ip="10.10.40.21",
+        mac_address="00-15-5D-99-22-04",
+        machine_group="Build Servers",
+        primary_user_upn="svc-deploy@contoso.com",
+    ),
+    Device(
+        device_id="be45cd61-1023-4ed0-9b1c-2e13ac55ff21",
+        device_name="WIN-FILE-01.contoso.com",
+        os_platform="WindowsServer2022",
+        os_version="10.0.20348.2402",
+        public_ip="20.43.122.12",
+        local_ip="10.10.50.10",
+        mac_address="00-15-5D-AA-33-15",
+        machine_group="File Servers",
+        primary_user_upn=None,
     ),
 )
 
@@ -566,6 +863,8 @@ class World(BaseModel):
     on_prem_sid_prefix: str = "S-1-5-21-1004336348-1177238915-682003330"
 
     domain_controllers: tuple[DomainController, ...] = _DEFAULT_DOMAIN_CONTROLLERS
+    devices: tuple[Device, ...] = _DEFAULT_DEVICES
+    processes: tuple[Process, ...] = _DEFAULT_PROCESSES
     users: tuple[User, ...] = _DEFAULT_USERS
     ips: tuple[IPEntry, ...] = _DEFAULT_IPS
     user_agents: tuple[UserAgentEntry, ...] = _DEFAULT_USER_AGENTS
@@ -599,6 +898,8 @@ class Overrides(BaseModel):
     on_prem_sid_prefix: Optional[str] = None
 
     domain_controllers: Optional[list[DomainController]] = None
+    devices: Optional[list[Device]] = None
+    processes: Optional[list[Process]] = None
     users: Optional[list[User]] = None
     ips: Optional[list[IPEntry]] = None
     user_agents: Optional[list[UserAgentEntry]] = None

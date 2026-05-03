@@ -100,6 +100,8 @@ The profile is validated by Pydantic models defined in [`world.py`](./world.py) 
 | Key | Item shape (required fields **bold**) | Used by |
 | --- | --- | --- |
 | `domain_controllers` | **`name`**, **`ip`**, **`device_id`** | Identity* tables |
+| `devices` | **`device_id`**, **`device_name`**, `os_platform`, `os_version`, `public_ip`, `local_ip`, `mac_address`, `machine_group`, `primary_user_upn` | Device* tables (DeviceEvents, DeviceProcessEvents, DeviceLogonEvents, …) |
+| `processes` | **`file_name`**, **`folder_path`**, **`company`**, **`description`**, **`internal_file_name`**, **`original_file_name`**, **`product_name`**, **`product_version`**, **`command_lines`**, `integrity_level`, `elevation`, `signature_status`, `signer_type`, `parent` | `InitiatingProcess*` columns on every Device* table |
 | `users` | **`display_name`**, **`upn`**, **`object_id`**, `type`, `device_name`, `device_id`, `last_password_change_days_ago`, `sam_account_name`, `sid_rid`, `given_name`, `surname`, `department`, `job_title`, `employee_id`, `city`, `country` | Almost every table |
 | `ips` | **`ip`**, **`city`**, **`state`**, **`country`**, **`isp`**, **`category`**, **`latitude`**, **`longitude`** | Source IPs across cloud and email tables |
 | `user_agents` | **`ua`**, **`platform`**, **`device_type`**, **`browser`** | `CloudAppEvents`, `EntraIdSignInEvents`, `IdentityLogonEvents` |
@@ -182,6 +184,14 @@ The generators are hand-curated per table to produce realistic, *correlated* val
 The `generate` command currently has handcrafted generators for:
 
 - `CloudAppEvents`
+- `DeviceEvents`
+- `DeviceFileCertificateInfo`
+- `DeviceImageLoadEvents`
+- `DeviceLogonEvents`
+- `DeviceNetworkEvents`
+- `DeviceNetworkInfo`
+- `DeviceProcessEvents`
+- `DeviceRegistryEvents`
 - `EmailAttachmentInfo`
 - `EmailEvents`
 - `EmailPostDeliveryEvents`
