@@ -182,34 +182,25 @@ def generate(
         None,
         exists=True,
         readable=True,
-        help=(
-            "Optional YAML profile: `tables:` picks which tables to emit, "
-            "`overrides:` replaces the default tenant fixtures. Omit to emit "
-            "every registered table with `contoso.com` defaults. "
-            "See `xdrgen.example.yaml`."
-        ),
+        help="Optional YAML profile selecting tables and overriding tenant fixtures.",
     ),
     output: pathlib.Path | None = typer.Option(
         None,
         "--output",
         "-o",
-        help=(
-            "Where to write the result. Defaults to `./telemetry.json` "
-            "(a single JSON array of events). When `--per-table` is set, the "
-            "default flips to `./telemetry/` (a directory of per-event files)."
-        ),
+        help="Output path. Defaults to `./telemetry.json`, or `./telemetry/` with `--per-table`.",
     ),
     count: int = typer.Option(
         10,
         "--count",
         "-n",
         min=1,
-        help="Number of events to generate. Ignored when --indefinite is set.",
+        help="Number of events to generate (ignored with --indefinite).",
     ),
     indefinite: bool = typer.Option(
         False,
         "--indefinite",
-        help="Generate events forever until interrupted (Ctrl+C).",
+        help="Run until interrupted with Ctrl+C.",
     ),
     interval: float = typer.Option(
         1.0,
@@ -221,86 +212,53 @@ def generate(
     echo: bool = typer.Option(
         False,
         "--echo",
-        help="Also print every generated event to stdout as it is generated.",
+        help="Also print each event to stdout.",
     ),
     per_table: bool = typer.Option(
         False,
         "--per-table",
-        help=(
-            "Write each event to its own JSON file named "
-            "`{TableName}-{n}.json` inside the output directory, instead of "
-            "one combined JSON array."
-        ),
+        help="Group events per-table: one file per event (file sink) or one topic per table (kafka).",
     ),
     flush_every: int = typer.Option(
         FLUSH_EVERY,
         "--flush-every",
         min=1,
-        help=(
-            "Buffer this many events in memory before flushing them to disk. "
-            "Lower values trade throughput for tighter memory use; higher "
-            "values batch more aggressively. The buffer is also flushed at "
-            "the end of a run and on Ctrl+C, so events are never lost."
-        ),
+        help="Buffer this many events before flushing to the active sink.",
     ),
     sink: SinkChoice = typer.Option(
         SinkChoice.file,
         "--sink",
-        help=(
-            "Where to send generated events. `file` writes JSON to disk; "
-            "`kafka` produces to a broker (requires --kafka-bootstrap); "
-            "`kustainer` ingests into a local Kusto emulator."
-        ),
+        help="Destination for events: `file`, `kafka`, or `kustainer`.",
     ),
     kafka_bootstrap: str | None = typer.Option(
         None,
         "--kafka-bootstrap",
-        help=(
-            "Comma-separated Kafka bootstrap servers (e.g. `localhost:9092`). "
-            "Required when --sink is `kafka`."
-        ),
+        help="Kafka bootstrap servers, e.g. `localhost:9092`. Required for --sink kafka.",
     ),
     kafka_topic: str = typer.Option(
         "xdrgen",
         "--kafka-topic",
-        help=(
-            "Kafka topic to produce events to. Ignored when `--per-table` is "
-            "set, which routes each event to a topic named after its table."
-        ),
+        help="Kafka topic to produce to (ignored with --per-table).",
     ),
     kafka_topic_prefix: str = typer.Option(
         "xdrgen.",
         "--kafka-topic-prefix",
-        help=(
-            "Prefix prepended to per-table Kafka topic names (used only with "
-            "`--per-table`). Default `xdrgen.` → `xdrgen.CloudAppEvents`. "
-            "Pass an empty string to use the bare table name."
-        ),
+        help="Prefix for per-table Kafka topic names (only with --per-table).",
     ),
     kustainer_cluster: str = typer.Option(
         "http://localhost:8080",
         "--kustainer-cluster",
-        help=(
-            "Kustainer (Kusto emulator) HTTP endpoint. Used only with "
-            "`--sink kustainer`."
-        ),
+        help="Kustainer (Kusto emulator) HTTP endpoint.",
     ),
     kustainer_database: str = typer.Option(
         "NetDefaultDB",
         "--kustainer-database",
-        help=(
-            "Kustainer database events are ingested into. The default "
-            "`NetDefaultDB` is the database that ships with the emulator."
-        ),
+        help="Kustainer database events are ingested into.",
     ),
     kustainer_table_prefix: str = typer.Option(
         "",
         "--kustainer-table-prefix",
-        help=(
-            "Prefix prepended to every Kustainer table name. Empty by "
-            "default — events go straight to the table named after their "
-            "model (e.g. `CloudAppEvents`)."
-        ),
+        help="Prefix prepended to every Kustainer table name.",
     ),
 ) -> None:
     """Generate production-like Defender XDR telemetry as JSON.
