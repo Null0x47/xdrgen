@@ -92,8 +92,11 @@ uv run xdrgen generate -n 100 -i 0 -o ./out/cae.json
 # 100 events, one JSON file per event, into ./out/events/
 uv run xdrgen generate -n 100 -i 0 -o ./out/events --per-table
 
-# Stream events forever, one every 2 seconds (writes once interrupted)
+# Stream events forever, one every 2 seconds, flushes after 10000 events or once interrupted
 uv run xdrgen generate --indefinite -i 2
+
+# Stream events forever, flush every 100 events
+uv run xdrgen generate --indefinite --flush-every 100
 
 # Stream to Kafka instead, single topic
 uv run xdrgen generate --sink kafka --kafka-bootstrap localhost:9092
