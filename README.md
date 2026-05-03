@@ -105,10 +105,13 @@ uv run xdrgen generate xdrgen.yaml -n 100
 | `--echo` | `false` | Also print every generated event to stdout as it is generated. |
 | `--per-table` | `false` | Cross-cuts the active sink — file: per-event files; Kafka: one topic per table. |
 | `--flush-every` | `10000` | Buffer this many events in memory before flushing them to disk. Lower values trade throughput for tighter memory; higher values batch more aggressively. The buffer is also flushed at end of run and on `Ctrl+C`. |
-| `--sink` | `file` | Where events go: `file` writes JSON to disk; `kafka` produces to a broker (requires `--kafka-bootstrap`). |
+| `--sink` | `file` | Where events go: `file` writes JSON to disk; `kafka` produces to a broker (requires `--kafka-bootstrap`); `kustainer` ingests into a local Kusto emulator. |
 | `--kafka-bootstrap` | _(unset)_ | Comma-separated Kafka bootstrap servers (e.g. `localhost:9092`). Required when `--sink kafka`. |
 | `--kafka-topic` | `xdrgen` | Kafka topic events are produced to. Ignored when `--per-table` is set. |
 | `--kafka-topic-prefix` | `xdrgen.` | Prefix prepended to per-table Kafka topic names. Used only with `--per-table` (e.g. `xdrgen.` → `xdrgen.CloudAppEvents`). Pass an empty string to use the bare table name. |
+| `--kustainer-cluster` | `http://localhost:8080` | Kustainer (Kusto emulator) HTTP endpoint. Used only with `--sink kustainer`. |
+| `--kustainer-database` | `NetDefaultDB` | Kustainer database events are ingested into. `NetDefaultDB` is the database that ships with the emulator. |
+| `--kustainer-table-prefix` | _(empty)_ | Prefix prepended to every Kustainer table name. Empty by default — events go straight to the table named after their model (e.g. `CloudAppEvents`). |
 
 Examples:
 
@@ -127,10 +130,11 @@ uv run xdrgen generate xdrgen.yaml --indefinite -i 2
 
 Sinks live in [`sinks/`](./sinks/). Each module defines a sink (a `Sink`-protocol class — `write(batch)` and `close()`) plus a `build(...)` factory; `main._build_sink` returns one based on `--sink`. The `--per-table` and `--flush-every` flags are sink-agnostic — they're handled by `main` and apply uniformly to whichever sink is active.
 
-Two sinks ship today:
+Three sinks ship today:
 
 - **`--sink file`** _(default)_ — JSON to disk. Single combined array, or per-event files with `--per-table`. See `sinks/file.py`.
 - **`--sink kafka`** — produces JSON to a Kafka broker via `kafka-python`. The table name is used as the message key so partitioning stays consistent per table. See `sinks/kafka.py`.
+- **`--sink kustainer`** — ingests directly into [Kustainer](https://learn.microsoft.com/en-us/azure/data-explorer/kusto-emulator-overview), Microsoft's official Kusto/ADX emulator, via the `azure-kusto-data` SDK. Each event lands in the table named after its Pydantic model (e.g. `CloudAppEvents`). The emulator does not implement streaming or queued ingestion, so the sink uses the universally-supported `.ingest inline` control command on the engine endpoint. See `sinks/kustainer.py`.
 
 ##### Adding a new sink
 
@@ -138,7 +142,7 @@ Two sinks ship today:
 2. Add an entry to the `SinkChoice` enum in `main.py` and a branch in `_build_sink` that calls your factory with the relevant CLI flags.
 3. Add CLI flags for any sink-specific config (mirror the `--kafka-*` pattern), and a unit test in `tests/test_sinks.py` that stubs out the underlying client so it doesn't need real infrastructure.
 
-##### Smoke-testing the Kafka sink locally
+##### Testing the Kafka sink locally
 
 A [`docker/docker-compose-kafka.yml`](./docker/docker-compose-kafka.yml) spins up a single-broker Kafka (KRaft mode, no Zookeeper) plus [Kafka UI](https://github.com/provectus/kafka-ui) so you can watch topics fill up:
 
@@ -149,6 +153,48 @@ uv run xdrgen generate -n 100 -i 0 --sink kafka --kafka-bootstrap localhost:9092
 ```
 
 The compose file exposes two listeners on the broker — `localhost:9092` for clients on your host (xdrgen) and `kafka:29092` for clients on the compose network (Kafka UI). Mismatched listeners are the most common Kafka-in-Compose footgun; this split keeps both paths working.
+
+##### Testing the Kustainer sink locally
+
+A [`docker/docker-compose-kustainer.yml`](./docker/docker-compose-kustainer.yml) spins up the official `kustainer-linux` image (single HTTP endpoint on `8080`, unauthenticated, `NetDefaultDB` database). Tables aren't created automatically by the sink — bootstrap them once with [`scripts/create_kustainer_tables.py`](./scripts/create_kustainer_tables.py), which walks every Pydantic model under `./models/` and emits a `.create-merge table` for each. Re-running it after `xdrgen update-models` is safe — `.create-merge` only adds new columns, it never drops existing data.
+
+```bash
+docker compose -f docker/docker-compose-kustainer.yml up -d
+uv run python scripts/create_kustainer_tables.py
+uv run xdrgen generate -n 100 -i 0 --sink kustainer
+```
+
+The script and the sink share their type mapping (`str`→`string`, `int`→`long`, `bool`→`bool`, `float`→`real`, `datetime`→`datetime`, anything else→`dynamic`) so the schema the script writes always matches the rows the sink emits. Pass `--dry-run` to print the control commands without touching the cluster, and `--cluster` / `--database` to point at a non-default emulator.
+
+###### Querying the local emulator
+
+Kustainer speaks the standard Kusto REST API at `http://localhost:8080/v1/rest/query` (queries) and `/v1/rest/mgmt` (control commands). Anything that talks to a real ADX cluster works against it — the only difference is the URL and the lack of authentication.
+
+The lowest-friction option is the [Azure Data Explorer Web UI](https://dataexplorer.azure.com): sign in to your Microsoft account, click *+ Add* -> *Connection*, paste `http://localhost:8080` in the *Connection URI* text field and you get the same query editor you'd use against a real cluster. Browser-side it's a JS app; queries go directly from your browser to `localhost:8080`.
+
+For a one-shot `curl`:
+
+```bash
+curl -s http://localhost:8080/v1/rest/query \
+  -H 'Content-Type: application/json' \
+  -d '{"db":"NetDefaultDB","csl":"CloudAppEvents | take 5"}'
+```
+
+Or from Python via the same SDK the sink uses:
+
+```python
+from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
+
+kcsb = KustoConnectionStringBuilder.with_no_authentication("http://localhost:8080")
+client = KustoClient(kcsb)
+response = client.execute("NetDefaultDB", "CloudAppEvents | summarize count() by ActionType")
+for row in response.primary_results[0]:
+    print(row["ActionType"], row["count_"])
+```
+
+`.show tables` (control command, run via `execute_mgmt`) is the quickest way to confirm the bootstrap script created everything before you start ingesting.
+
+The image is x86_64 only; on Apple Silicon, set `--platform linux/amd64` in the compose file (Docker emulates, so it is slow). The emulator has no separate ingest URI, no streaming ingestion, no queued ingestion, and no authentication — `mcr.microsoft.com/azuredataexplorer/kustainer-linux` is for local development only.
 
 #### Production-like data
 

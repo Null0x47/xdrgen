@@ -27,12 +27,14 @@ except ImportError:
 from sinks import Sink
 from sinks import file as file_sink
 from sinks import kafka as kafka_sink
+from sinks import kustainer as kustainer_sink
 from world import Profile
 
 
 class SinkChoice(str, enum.Enum):
     file = "file"
     kafka = "kafka"
+    kustainer = "kustainer"
 
 
 MODELS_DIR = pathlib.Path("./models")
@@ -143,6 +145,9 @@ def _build_sink(
     kafka_bootstrap: str | None,
     kafka_topic: str,
     kafka_topic_prefix: str,
+    kustainer_cluster: str,
+    kustainer_database: str,
+    kustainer_table_prefix: str,
 ) -> Sink:
     """Build the single active sink based on the `--sink` flag.
 
@@ -161,6 +166,12 @@ def _build_sink(
             per_table=per_table,
             topic=kafka_topic,
             topic_prefix=kafka_topic_prefix,
+        )
+    if sink_choice is SinkChoice.kustainer:
+        return kustainer_sink.build(
+            cluster_uri=kustainer_cluster,
+            database=kustainer_database,
+            table_prefix=kustainer_table_prefix,
         )
     raise typer.BadParameter(f"Unknown sink: {sink_choice}")
 
@@ -237,7 +248,8 @@ def generate(
         "--sink",
         help=(
             "Where to send generated events. `file` writes JSON to disk; "
-            "`kafka` produces to a broker (requires --kafka-bootstrap)."
+            "`kafka` produces to a broker (requires --kafka-bootstrap); "
+            "`kustainer` ingests into a local Kusto emulator."
         ),
     ),
     kafka_bootstrap: str | None = typer.Option(
@@ -263,6 +275,31 @@ def generate(
             "Prefix prepended to per-table Kafka topic names (used only with "
             "`--per-table`). Default `xdrgen.` → `xdrgen.CloudAppEvents`. "
             "Pass an empty string to use the bare table name."
+        ),
+    ),
+    kustainer_cluster: str = typer.Option(
+        "http://localhost:8080",
+        "--kustainer-cluster",
+        help=(
+            "Kustainer (Kusto emulator) HTTP endpoint. Used only with "
+            "`--sink kustainer`."
+        ),
+    ),
+    kustainer_database: str = typer.Option(
+        "NetDefaultDB",
+        "--kustainer-database",
+        help=(
+            "Kustainer database events are ingested into. The default "
+            "`NetDefaultDB` is the database that ships with the emulator."
+        ),
+    ),
+    kustainer_table_prefix: str = typer.Option(
+        "",
+        "--kustainer-table-prefix",
+        help=(
+            "Prefix prepended to every Kustainer table name. Empty by "
+            "default — events go straight to the table named after their "
+            "model (e.g. `CloudAppEvents`)."
         ),
     ),
 ) -> None:
@@ -294,6 +331,9 @@ def generate(
         kafka_bootstrap=kafka_bootstrap,
         kafka_topic=kafka_topic,
         kafka_topic_prefix=kafka_topic_prefix,
+        kustainer_cluster=kustainer_cluster,
+        kustainer_database=kustainer_database,
+        kustainer_table_prefix=kustainer_table_prefix,
     )
     buffer: list[tuple[str, BaseModel]] = []
     total = 0
@@ -318,9 +358,12 @@ def generate(
             active_sink.write(buffer)
         active_sink.close()
 
-    destination = (
-        str(output) if sink is SinkChoice.file else f"kafka://{kafka_bootstrap}"
-    )
+    if sink is SinkChoice.file:
+        destination = str(output)
+    elif sink is SinkChoice.kafka:
+        destination = f"kafka://{kafka_bootstrap}"
+    else:
+        destination = f"kustainer://{kustainer_cluster}/{kustainer_database}"
     typer.echo(f"Wrote {total} event(s) to {destination}.")
 
 

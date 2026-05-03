@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import json
 import pathlib
+from datetime import datetime
+from typing import Any, Optional
+
+from pydantic import BaseModel, Field
 
 from sinks import file as file_sink
 from sinks import kafka as kafka_sink
+from sinks import kustainer as kustainer_sink
 
 
 class _StubEvent:
@@ -107,6 +112,167 @@ def test_kafka_sink_close_flushes_and_closes_producer():
     sink.close()
     assert producer.flushed >= 1
     assert producer.closed is True
+
+
+class _SampleEvent(BaseModel):
+    """Stand-in Pydantic model exercising every Kusto type the sink emits."""
+
+    Name: Optional[str] = Field(None)
+    Count: Optional[int] = Field(None)
+    Score: Optional[float] = Field(None)
+    Active: Optional[bool] = Field(None)
+    Timestamp: Optional[datetime] = Field(None)
+    Payload: Optional[Any] = Field(None)
+    Kind: Optional[str] = Field(None, alias="type")
+
+
+class _RecordingKustoClient:
+    """Stand-in for `azure.kusto.data.KustoClient` so KustainerSink tests
+    don't need a running emulator."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+        self.closed = False
+
+    def execute_mgmt(self, database: str, command: str):
+        self.calls.append((database, command))
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def _build_kustainer_sink(table_prefix: str = "") -> tuple:
+    client = _RecordingKustoClient()
+    sink = kustainer_sink.KustainerSink(
+        cluster_uri="http://localhost:8080",
+        database="NetDefaultDB",
+        table_prefix=table_prefix,
+        client_factory=lambda _uri: client,
+    )
+    return sink, client
+
+
+def test_kustainer_sink_groups_events_by_table_into_one_command_per_table():
+    sink, client = _build_kustainer_sink()
+
+    sink.write(
+        [
+            ("SampleA", _SampleEvent(Name="a")),
+            ("SampleB", _SampleEvent(Name="b")),
+            ("SampleA", _SampleEvent(Name="c")),
+        ]
+    )
+
+    assert len(client.calls) == 2
+    targets = [cmd.splitlines()[0] for _db, cmd in client.calls]
+    assert ".ingest inline into table SampleA <|" in targets
+    assert ".ingest inline into table SampleB <|" in targets
+
+
+def test_kustainer_sink_table_prefix_is_applied():
+    sink, client = _build_kustainer_sink(table_prefix="xdr_")
+
+    sink.write([("SampleA", _SampleEvent(Name="a"))])
+
+    assert client.calls[0][1].startswith(".ingest inline into table xdr_SampleA <|")
+
+
+def test_kustainer_sink_serialises_each_kusto_type_correctly():
+    sink, client = _build_kustainer_sink()
+
+    sink.write(
+        [
+            (
+                "Sample",
+                _SampleEvent(
+                    Name="hello, world",
+                    Count=42,
+                    Score=3.5,
+                    Active=True,
+                    Timestamp=datetime(2024, 1, 2, 3, 4, 5),
+                    Payload={"k": "v"},
+                    type="alpha",
+                ),
+            )
+        ]
+    )
+
+    _, command = client.calls[0]
+    row = command.splitlines()[1]
+    cells = list(_iter_csv_cells(row))
+    # Field order matches model_fields declaration order.
+    assert cells[0] == '"hello, world"'  # quoted because of comma
+    assert cells[1] == "42"
+    assert cells[2] == "3.5"
+    assert cells[3] == "true"
+    assert cells[4] == "2024-01-02T03:04:05"
+    assert cells[5] == '"{""k"": ""v""}"'  # dynamic JSON, CSV-escaped
+    assert cells[6] == "alpha"  # alias-named string field
+
+
+def test_kustainer_sink_emits_empty_cell_for_none_values():
+    sink, client = _build_kustainer_sink()
+
+    sink.write([("Sample", _SampleEvent())])
+
+    _, command = client.calls[0]
+    row = command.splitlines()[1]
+    assert row == ",,,,,,"  # seven fields, all empty
+
+
+def test_kustainer_sink_close_closes_underlying_client():
+    sink, client = _build_kustainer_sink()
+    sink.close()
+    assert client.closed is True
+
+
+def test_kustainer_columns_for_model_maps_pydantic_types_to_kusto_types():
+    columns = dict(kustainer_sink.columns_for_model(_SampleEvent))
+
+    assert columns == {
+        "Name": "string",
+        "Count": "long",
+        "Score": "real",
+        "Active": "bool",
+        "Timestamp": "datetime",
+        "Payload": "dynamic",
+        "type": "string",  # alias-named field uses its alias as the column name
+    }
+
+
+def _iter_csv_cells(row: str):
+    """Tiny CSV splitter for the test — handles `"` quoting with `""` escapes."""
+    cell: list[str] = []
+    in_quotes = False
+    i = 0
+    while i < len(row):
+        c = row[i]
+        if in_quotes:
+            if c == '"' and i + 1 < len(row) and row[i + 1] == '"':
+                cell.append('""')
+                i += 2
+                continue
+            if c == '"':
+                in_quotes = False
+                cell.append(c)
+                i += 1
+                continue
+            cell.append(c)
+            i += 1
+            continue
+        if c == '"':
+            in_quotes = True
+            cell.append(c)
+            i += 1
+            continue
+        if c == ",":
+            yield "".join(cell)
+            cell = []
+            i += 1
+            continue
+        cell.append(c)
+        i += 1
+    yield "".join(cell)
 
 
 def test_file_sink_build_picks_per_table_when_flag_set(tmp_path: pathlib.Path):

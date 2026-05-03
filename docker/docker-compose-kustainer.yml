@@ -1,0 +1,27 @@
+# Local Kustainer (Microsoft's official Kusto emulator) for smoke-testing the
+# kustainer sink.
+#
+# Usage:
+#     docker compose -f docker/docker-compose-kustainer.yml up -d
+#     uv run python scripts/create_kustainer_tables.py
+#     uv run xdrgen generate --sink kustainer -n 100 -i 0
+#
+# The image is x86_64 only — Apple Silicon needs `--platform linux/amd64`
+# emulation. `ACCEPT_EULA=Y` is mandatory; the container exits otherwise.
+# The endpoint at http://localhost:8080 is unauthenticated HTTP — both query
+# and management share that single port. There is no separate ingest URI on
+# the emulator: streaming ingestion and the Data Management service are not
+# implemented, so the kustainer sink uses `.ingest inline` against the engine
+# endpoint instead.
+#
+# See: https://learn.microsoft.com/en-us/azure/data-explorer/kusto-emulator-overview
+
+services:
+  kustainer:
+    image: mcr.microsoft.com/azuredataexplorer/kustainer-linux:latest
+    container_name: xdrgen-kustainer
+    ports:
+      - "8080:8080"
+    environment:
+      ACCEPT_EULA: "Y"
+    mem_limit: 4g
