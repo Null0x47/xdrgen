@@ -14,22 +14,62 @@ It does two things:
 - Python 3.12+
 - [uv](https://github.com/astral-sh/uv)
 
-## Quickstart
-
-```bash
-# Install dependencies
-uv sync
-
-# Generate 10 events for every registered table into ./telemetry.json
-uv run xdrgen generate
-
-# Or generate 100 events, no delay between them
-uv run xdrgen generate -n 100 -i 0
-```
-
 ## Commands
 
 ### `generate`
+
+```
+░██    ░██ ░███████   ░█████████    ░██████  ░██████████ ░███    ░██
+ ░██  ░██  ░██   ░██  ░██     ░██  ░██   ░██ ░██         ░████   ░██
+  ░██░██   ░██    ░██ ░██     ░██ ░██        ░██         ░██░██  ░██
+   ░███    ░██    ░██ ░█████████  ░██  █████ ░█████████  ░██ ░██ ░██
+  ░██░██   ░██    ░██ ░██   ░██   ░██     ██ ░██         ░██  ░██░██
+ ░██  ░██  ░██   ░██  ░██    ░██   ░██  ░███ ░██         ░██   ░████
+░██    ░██ ░███████   ░██     ░██   ░█████░█ ░██████████ ░██    ░███
+                                                               v0.1.0
+
+ Usage: xdrgen generate [OPTIONS] [PROFILE]
+
+ Generate production-like Defender XDR telemetry as JSON.
+
+ Events are buffered in memory and flushed to disk every `--flush-every`
+ events — so neither finite (`-n`) nor `--indefinite` runs grow memory
+ without bound. The buffer is also flushed on `Ctrl+C` and at the end of
+ a finite run, so no event written to memory is ever lost.
+
+╭─ Arguments ──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│   profile      [PROFILE]  Optional YAML profile selecting tables and overriding tenant fixtures.                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --output                  -o      PATH                    Output path. Defaults to `./telemetry.json`, or            │
+│                                                           `./telemetry/` with `--per-table`.                         │
+│ --count                   -n      INTEGER RANGE [x>=1]    Number of events to generate (ignored with --indefinite).  │
+│                                                           [default: 10]                                              │
+│ --indefinite                                              Run until interrupted with Ctrl+C.                         │
+│ --interval                -i      FLOAT RANGE [x>=0.0]    Seconds to wait between events. [default: 1.0]             │
+│ --echo                                                    Also print each event to stdout.                           │
+│ --per-table                                               Group events per-table: one file per event (file sink) or  │
+│                                                           one topic per table (kafka).                               │
+│ --flush-every                     INTEGER RANGE [x>=1]    Buffer this many events before flushing to the active      │
+│                                                           sink.                                                      │
+│                                                           [default: 10000]                                           │
+│ --sink                            [file|kafka|kustainer]  Destination for events: `file`, `kafka`, or `kustainer`.   │
+│                                                           [default: file]                                            │
+│ --kafka-bootstrap                 TEXT                    Kafka bootstrap servers, e.g. `localhost:9092`. Required   │
+│                                                           for --sink kafka.                                          │
+│ --kafka-topic                     TEXT                    Kafka topic to produce to (ignored with --per-table).      │
+│                                                           [default: xdrgen]                                          │
+│ --kafka-topic-prefix              TEXT                    Prefix for per-table Kafka topic names (only with          │
+│                                                           --per-table).                                              │
+│                                                           [default: xdrgen.]                                         │
+│ --kustainer-cluster               TEXT                    Kustainer (Kusto emulator) HTTP endpoint.                  │
+│                                                           [default: http://localhost:8080]                           │
+│ --kustainer-database              TEXT                    Kustainer database events are ingested into.               │
+│                                                           [default: NetDefaultDB]                                    │
+│ --kustainer-table-prefix          TEXT                    Prefix prepended to every Kustainer table name.            │
+│ --help                                                    Show this message and exit.                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
 
 Produce coherent, production-like telemetry events as JSON, driven by an optional YAML profile. Each event is generated, validated through its Pydantic model (so field names and types match the real Defender XDR columns), and handed to a *sink* — `file` by default, `kafka` for streaming to a broker. Pick one with `--sink`; see [Sinks](#sinks) below for what ships and how to add more.
 
@@ -46,17 +86,17 @@ Both the YAML profile itself and its `tables:` key are optional — omit either 
 # All tables that have a generator, file sink, ./telemetry.json
 uv run xdrgen generate
 
-# Pass a profile to override defaults and/or restrict to a subset of tables
-uv run xdrgen generate xdrgen.yaml
+# 100 events, no delay between them, into a custom file
+uv run xdrgen generate -n 100 -i 0 -o ./out/cae.json
+
+# 100 events, one JSON file per event, into ./out/events/
+uv run xdrgen generate -n 100 -i 0 -o ./out/events --per-table
+
+# Stream events forever, one every 2 seconds (writes once interrupted)
+uv run xdrgen generate --indefinite -i 2
 
 # Stream to Kafka instead, single topic
-uv run xdrgen generate xdrgen.yaml --sink kafka --kafka-bootstrap localhost:9092
-```
-
-```yaml
-# xdrgen.yaml — `tables:` optional; omit to include every registered table
-tables:
-  - CloudAppEvents
+uv run xdrgen generate --sink kafka --kafka-bootstrap localhost:9092
 ```
 
 Pass `--echo` to also stream every generated event to stdout as it is written, regardless of which sink is active — useful for piping or watching the stream live.
@@ -101,26 +141,7 @@ cp xdrgen.example.yaml xdrgen.yaml
 uv run xdrgen generate xdrgen.yaml -n 100
 ```
 
-#### Flags
-
-| Flag | Default | Description |
-| --- | --- | --- |
-| `-o`, `--output` | `telemetry.json` (file) / `telemetry/` (dir, with `--per-table`) | Output path. A file in default mode (overwritten each run); a directory in per-table mode (created if missing, existing files inside are not removed). |
-| `-n`, `--count` | `10` | Number of events to generate. Ignored when `--indefinite` is set. |
-| `--indefinite` | `false` | Run forever until interrupted with `Ctrl+C`. The flush cadence (`--flush-every`) keeps memory bounded across long runs. |
-| `-i`, `--interval` | `1.0` | Seconds to wait between events. Set to `0` for no delay. |
-| `--echo` | `false` | Also print every generated event to stdout as it is generated. |
-| `--per-table` | `false` | Cross-cuts the active sink — file: per-event files; Kafka: one topic per table. |
-| `--flush-every` | `10000` | Buffer this many events in memory before flushing them to disk. Lower values trade throughput for tighter memory; higher values batch more aggressively. The buffer is also flushed at end of run and on `Ctrl+C`. |
-| `--sink` | `file` | Where events go: `file` writes JSON to disk; `kafka` produces to a broker (requires `--kafka-bootstrap`); `kustainer` ingests into a local Kusto emulator. |
-| `--kafka-bootstrap` | _(unset)_ | Comma-separated Kafka bootstrap servers (e.g. `localhost:9092`). Required when `--sink kafka`. |
-| `--kafka-topic` | `xdrgen` | Kafka topic events are produced to. Ignored when `--per-table` is set. |
-| `--kafka-topic-prefix` | `xdrgen.` | Prefix prepended to per-table Kafka topic names. Used only with `--per-table` (e.g. `xdrgen.` → `xdrgen.CloudAppEvents`). Pass an empty string to use the bare table name. |
-| `--kustainer-cluster` | `http://localhost:8080` | Kustainer (Kusto emulator) HTTP endpoint. Used only with `--sink kustainer`. |
-| `--kustainer-database` | `NetDefaultDB` | Kustainer database events are ingested into. `NetDefaultDB` is the database that ships with the emulator. |
-| `--kustainer-table-prefix` | _(empty)_ | Prefix prepended to every Kustainer table name. Empty by default — events go straight to the table named after their model (e.g. `CloudAppEvents`). |
-
-Examples:
+#### Examples
 
 ```bash
 # 100 events, no delay between them, into a custom file
