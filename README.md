@@ -14,10 +14,17 @@ It does two things:
 - Python 3.12+
 - [uv](https://github.com/astral-sh/uv)
 
-## Setup
+## Quickstart
 
 ```bash
+# Install dependencies
 uv sync
+
+# Generate 10 events for every registered table into ./telemetry.json
+uv run xdrgen generate
+
+# Or generate 100 events for a specific table, no delay between them
+uv run xdrgen generate -n 100 -i 0
 ```
 
 ## Commands
