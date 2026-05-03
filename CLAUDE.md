@@ -37,4 +37,4 @@ uv run pytest -q
 * Do not add redundant section devider comments
 * Always format Python source
 * Always lint Python source with `ruff check --fix` to auto-apply safe fixes
-* Always update the --help output in README.md if something changes in the CLI
+* Always update the `generate --help` output in README.md if something changes in the CLI
