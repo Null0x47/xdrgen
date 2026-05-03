@@ -6,8 +6,8 @@
 
 It does two things:
 
-1. **`update-models`** — fetch the canonical list of Defender XDR / MDE tables and their column schemas from the [`Azure/Azure-Sentinel`](https://github.com/Azure/Azure-Sentinel) repo, and emit one strongly-typed Pydantic model per table into `./models/`.
-2. **`generate`** — produce coherent, production-like telemetry events as JSON, driven by a YAML profile that lists which tables to emit.
+1. **`generate`** — produce coherent, production-like telemetry events as JSON, driven by a YAML profile that lists which tables to emit.
+2. **`update-models`** — fetch the canonical list of Defender XDR / MDE tables and their Solution Analyzer column schemas from the [`Azure/Azure-Sentinel`](https://github.com/Azure/Azure-Sentinel) repo, and emit one strongly-typed Pydantic model per table into `./models/`.
 
 ## Requirements
 
@@ -21,31 +21,6 @@ uv sync
 ```
 
 ## Commands
-
-### `update-models`
-
-Fetches three CSVs from `Azure/Azure-Sentinel/Tools/Solutions Analyzer/`:
-
-- `tables.csv` and `tables_reference.csv` — overlapping table catalogues. The union of rows whose `category` column contains `xdr` or `mde` (case-insensitive) defines the Defender XDR / MDE table set.
-- `table_schemas.csv` — column-level schemas (table name, column name, type, description).
-
-It then writes one Pydantic model per table into `./models/`.
-
-```bash
-uv run xdrgen update-models
-```
-
-System columns starting with `_` (e.g. `_BilledSize`, `_IsBillable`, `_ResourceId`) are skipped — only first-class table columns become model fields. All fields are `Optional[T] = Field(None, ...)` because XDR events are inherently sparse. Column descriptions from the source docs become Pydantic field descriptions.
-
-```python
-from models import CloudAppEvents
-
-event = CloudAppEvents(
-    ActionType="FileDownloaded",
-    AccountDisplayName="Avery Chen",
-    IPAddress="20.43.122.12",
-)
-```
 
 ### `generate`
 
@@ -207,6 +182,33 @@ The `generate` command currently has handcrafted generators for:
 - `UrlClickEvents`
 
 Listing a table in the YAML that does not have a generator yet will fail fast with a list of available tables. More generators will be added over time.
+
+### `update-models`
+
+Fetches three CSVs from `Azure/Azure-Sentinel/Tools/Solutions Analyzer/`:
+
+- `tables.csv` and `tables_reference.csv` — overlapping table catalogues. The union of rows whose `category` column contains `xdr` or `mde` (case-insensitive) defines the Defender XDR / MDE table set.
+- `table_schemas.csv` — column-level schemas (table name, column name, type, description).
+
+It then writes one Pydantic model per table into `./models/`.
+
+```bash
+uv run xdrgen update-models
+```
+
+System columns starting with `_` (e.g. `_BilledSize`, `_IsBillable`, `_ResourceId`) are skipped — only first-class table columns become model fields. All fields are `Optional[T] = Field(None, ...)` because XDR events are inherently sparse. Column descriptions from the source docs become Pydantic field descriptions.
+
+```python
+from models import CloudAppEvents
+
+event = CloudAppEvents(
+    ActionType="FileDownloaded",
+    AccountDisplayName="Avery Chen",
+    IPAddress="20.43.122.12",
+)
+```
+
+You usually don't need to run this yourself — a [GitHub Actions workflow](./.github/workflows/update-models.yml) runs `update-models` daily at 06:00 UTC against `main`, and any diff in `./models/` is opened as a PR and squash-merged once lint and tests pass. So `main` always tracks the latest upstream Defender XDR / MDE schemas.
 
 ## Development
 
