@@ -163,10 +163,10 @@ Two sinks ship today:
 
 ##### Smoke-testing the Kafka sink locally
 
-A [`docker-compose.yml`](./docker-compose.yml) at the repo root spins up a single-broker Kafka (KRaft mode, no Zookeeper) plus [Kafka UI](https://github.com/provectus/kafka-ui) so you can watch topics fill up:
+A [`docker/docker-compose-kafka.yml`](./docker/docker-compose-kafka.yml) spins up a single-broker Kafka (KRaft mode, no Zookeeper) plus [Kafka UI](https://github.com/provectus/kafka-ui) so you can watch topics fill up:
 
 ```bash
-docker compose up -d
+docker compose -f docker/docker-compose-kafka.yml up -d
 uv run xdrgen generate -n 100 -i 0 --sink kafka --kafka-bootstrap localhost:9092
 # Then browse http://localhost:8080 → cluster `local` → Topics.
 ```
