@@ -72,8 +72,8 @@ pytest -q
 │ --flush-every                     INTEGER RANGE [x>=1]    Buffer this many events before flushing to the active      │
 │                                                           sink.                                                      │
 │                                                           [default: 10000]                                           │
-│ --sink                            [file|kafka|kustainer]  Destination for events: `file`, `kafka`, or `kustainer`.   │
-│                                                           [default: file]                                            │
+│ --sink                            [json|kafka|kustainer]  Destination for events: `json`, `kafka`, or `kustainer`.   │
+│                                                           [default: json]                                            │
 │ --kafka-bootstrap                 TEXT                    Kafka bootstrap servers, e.g. `localhost:9092`. Required   │
 │                                                           for --sink kafka.                                          │
 │ --kafka-topic                     TEXT                    Kafka topic to produce to (ignored with --per-table).      │
@@ -90,13 +90,13 @@ pytest -q
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-Produce coherent, production-like telemetry events as JSON, driven by an optional YAML profile. Each event is generated, validated through its Pydantic model (so field names and types match the real Defender XDR columns), and handed to a *sink* — `file` by default, `kafka` for streaming to a broker. Pick one with `--sink`; see [Sinks](#sinks) below for what ships and how to add more.
+Produce coherent, production-like telemetry events as JSON, driven by an optional YAML profile. Each event is generated, validated through its Pydantic model (so field names and types match the real Defender XDR columns), and handed to a *sink* — `json` by default, `kafka` for streaming to a broker. Pick one with `--sink`; see [Sinks](#sinks) below for what ships and how to add more.
 
 Events are buffered in memory and flushed to the active sink every `--flush-every` events (default 10 000), as well as at the end of a run and on `Ctrl+C`. Neither finite (`-n`) nor `--indefinite` runs grow memory without bound, and no buffered event is ever lost.
 
 `--per-table` cross-cuts whichever sink is active — it changes how events are *grouped*, not where they're sent:
 
-- `--sink file` (default): one combined `./telemetry.json` array → with `--per-table`, one file per event under `./telemetry/{TableName}-{n:04d}.json`.
+- `--sink json` (default): one combined `./telemetry.json` array → with `--per-table`, one file per event under `./telemetry/{TableName}-{n:04d}.json`.
 - `--sink kafka`: every event to `--kafka-topic` (default `xdrgen`) → with `--per-table`, one topic per table named `{--kafka-topic-prefix}{TableName}` (default prefix `xdrgen.` → `xdrgen.CloudAppEvents`, `xdrgen.EmailEvents`, …).
 
 Both the YAML profile itself and its `tables:` key are optional — omit either to generate for every table that has a generator.
@@ -184,7 +184,7 @@ Sinks live in [`sinks/`](./sinks/). Each module defines a sink (a `Sink`-protoco
 
 Three sinks ship today:
 
-- **`--sink file`** _(default)_ — JSON to disk. Single combined array, or per-event files with `--per-table`. See `sinks/file.py`.
+- **`--sink json`** _(default)_ — JSON to disk. Single combined array, or per-event files with `--per-table`. See `sinks/json.py`.
 - **`--sink kafka`** — produces JSON to a Kafka broker via `kafka-python`. The table name is used as the message key so partitioning stays consistent per table. See `sinks/kafka.py`.
 - **`--sink kustainer`** — ingests directly into [Kustainer](https://learn.microsoft.com/en-us/azure/data-explorer/kusto-emulator-overview), Microsoft's official Kusto/ADX emulator, via the `azure-kusto-data` SDK. Each event lands in the table named after its Pydantic model (e.g. `CloudAppEvents`). The emulator does not implement streaming or queued ingestion, so the sink uses the universally-supported `.ingest inline` control command on the engine endpoint. See `sinks/kustainer.py`.
 

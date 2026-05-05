@@ -7,7 +7,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from sinks import file as file_sink
+from sinks import json as json_sink
 from sinks import kafka as kafka_sink
 from sinks import kustainer as kustainer_sink
 
@@ -272,15 +272,15 @@ def _iter_csv_cells(row: str):
     yield "".join(cell)
 
 
-def test_file_sink_build_picks_per_table_when_flag_set(tmp_path: pathlib.Path):
+def test_json_sink_build_picks_per_table_when_flag_set(tmp_path: pathlib.Path):
     out_dir = tmp_path / "out"
-    sink = file_sink.build(out_dir, per_table=True)
-    assert isinstance(sink, file_sink.PerTableFileSink)
+    sink = json_sink.build(out_dir, per_table=True)
+    assert isinstance(sink, json_sink.PerTableJsonSink)
     sink.close()
 
 
-def test_file_sink_build_picks_json_array_by_default(tmp_path: pathlib.Path):
+def test_json_sink_build_picks_json_array_by_default(tmp_path: pathlib.Path):
     out_file = tmp_path / "out.json"
-    sink = file_sink.build(out_file, per_table=False)
-    assert isinstance(sink, file_sink.JsonArrayFileSink)
+    sink = json_sink.build(out_file, per_table=False)
+    assert isinstance(sink, json_sink.JsonArraySink)
     sink.close()

@@ -23,14 +23,14 @@ except ImportError:
     GENERATORS: dict = {}
 
 from sinks import Sink
-from sinks import file as file_sink
+from sinks import json as json_sink
 from sinks import kafka as kafka_sink
 from sinks import kustainer as kustainer_sink
 from world import Profile
 
 
 class SinkChoice(str, enum.Enum):
-    file = "file"
+    json = "json"
     kafka = "kafka"
     kustainer = "kustainer"
 
@@ -143,8 +143,8 @@ def _build_sink(
     kustainer_table_prefix: str,
 ) -> Sink:
     """Build the active sink for `--sink`."""
-    if sink_choice is SinkChoice.file:
-        return file_sink.build(output, per_table=per_table)
+    if sink_choice is SinkChoice.json:
+        return json_sink.build(output, per_table=per_table)
     if sink_choice is SinkChoice.kafka:
         if not kafka_bootstrap:
             raise typer.BadParameter(
@@ -215,9 +215,9 @@ def generate(
         help="Buffer this many events before flushing to the active sink.",
     ),
     sink: SinkChoice = typer.Option(
-        SinkChoice.file,
+        SinkChoice.json,
         "--sink",
-        help="Destination for events: `file`, `kafka`, or `kustainer`.",
+        help="Destination for events: `json`, `kafka`, or `kustainer`.",
     ),
     kafka_bootstrap: str | None = typer.Option(
         None,
@@ -303,7 +303,7 @@ def generate(
             active_sink.write(buffer)
         active_sink.close()
 
-    if sink is SinkChoice.file:
+    if sink is SinkChoice.json:
         destination = str(output)
     elif sink is SinkChoice.kafka:
         destination = f"kafka://{kafka_bootstrap}"

@@ -480,16 +480,16 @@ def test_generate_sink_kafka_per_table_passes_through(
     assert captured["topic_prefix"] == "xdrgen."
 
 
-def test_generate_default_sink_is_file(
+def test_generate_default_sink_is_json(
     runner: CliRunner,
     tmp_path: pathlib.Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """No `--sink` flag → file sink is used, Kafka is not built."""
+    """No `--sink` flag → json sink is used, Kafka is not built."""
     _install_stub_generators(monkeypatch)
 
     def fake_kafka_build(**_kw):
-        raise AssertionError("Kafka sink built when --sink defaulted to file.")
+        raise AssertionError("Kafka sink built when --sink defaulted to json.")
 
     monkeypatch.setattr(main_module.kafka_sink, "build", fake_kafka_build)
     output = tmp_path / "out.json"

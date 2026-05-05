@@ -1,4 +1,4 @@
-"""File sinks: one JSON-array file (default) or one file per event (--per-table)."""
+"""JSON sink: one JSON-array file (default) or one file per event (--per-table)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import pathlib
 from sinks.base import Batch, Sink
 
 
-class JsonArrayFileSink:
+class JsonArraySink:
     """Streams events into one JSON-array file; flushes per batch."""
 
     def __init__(self, output: pathlib.Path) -> None:
@@ -29,7 +29,7 @@ class JsonArrayFileSink:
         self._f.close()
 
 
-class PerTableFileSink:
+class PerTableJsonSink:
     """One JSON file per event: `{TableName}-{n:04d}.json` (counter is per-table)."""
 
     def __init__(self, output: pathlib.Path) -> None:
@@ -51,4 +51,4 @@ class PerTableFileSink:
 
 
 def build(output: pathlib.Path, per_table: bool) -> Sink:
-    return PerTableFileSink(output) if per_table else JsonArrayFileSink(output)
+    return PerTableJsonSink(output) if per_table else JsonArraySink(output)
