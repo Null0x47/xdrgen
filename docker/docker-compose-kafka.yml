@@ -1,15 +1,9 @@
-# Local Kafka broker + UI for smoke-testing the Kafka sink.
+# Local Kafka broker + UI for the kafka sink.
+#   docker compose up -d
+#   uv run xdrgen generate --sink kafka --kafka-bootstrap localhost:9092
+# UI: http://localhost:8080
 #
-# Usage:
-#     docker compose up -d
-#     uv run xdrgen generate --sink kafka --kafka-bootstrap localhost:9092 -n 100 -i 0
-#     # then browse http://localhost:8080 to see the topics fill up.
-#
-# Single-broker KRaft setup (no Zookeeper). Two listeners are exposed:
-#   - HOST://localhost:9092   — for clients running on your machine (xdrgen).
-#   - DOCKER://kafka:29092    — for clients on the compose network (kafka-ui).
-# Mismatched listeners are the most common Kafka-in-Compose footgun; this split
-# keeps both paths working.
+# Single-broker KRaft. HOST listener for the host, DOCKER listener for kafka-ui.
 
 services:
   kafka:
