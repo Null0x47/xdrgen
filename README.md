@@ -90,7 +90,7 @@ pytest -q
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-Produce coherent, production-like telemetry events as JSON, driven by an optional YAML profile. Each event is generated, validated through its Pydantic model (so field names and types match the real Defender XDR columns), and handed to a *sink* — `json` by default, `kafka` for streaming to a broker. Pick one with `--sink`; see [Sinks](#sinks) below for what ships and how to add more.
+Produce coherent, production-like telemetry events as JSON, driven by an optional YAML profile. Each event is generated, validated through its Pydantic model (so field names and types match the real Defender XDR columns), and handed to a *sink* — `json` by default. Pick one with `--sink`; see [Sinks](#sinks) below for what ships and how to add more.
 
 Events are buffered in memory and flushed to the active sink every `--flush-every` events (default 10 000), as well as at the end of a run and on `Ctrl+C`. Neither finite (`-n`) nor `--indefinite` runs grow memory without bound, and no buffered event is ever lost.
 
