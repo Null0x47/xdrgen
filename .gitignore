@@ -11,8 +11,10 @@ wheels/
 # Virtual environments
 .venv
 
-# XDRGEN Config
+# XDRGEN
 xdrgen.yaml
+profile.yaml
+telemetry.json
 
 # Claude
 .claude

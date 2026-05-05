@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import random
 import uuid
 
@@ -43,8 +44,10 @@ def _redirect_chain(url: str) -> str:
     final URL so the column carries something realistic."""
     safelinks = f"https://eur01.safelinks.protection.outlook.com/?url={url}&data={uuid.uuid4().hex[:16]}"
     if random.random() < 0.3:
-        return f"{safelinks} -> https://t.co/{uuid.uuid4().hex[:8]} -> {url}"
-    return f"{safelinks} -> {url}"
+        chain = [safelinks, f"https://t.co/{uuid.uuid4().hex[:8]}", url]
+    else:
+        chain = [safelinks, url]
+    return json.dumps(chain)
 
 
 @register("UrlClickEvents")
