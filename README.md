@@ -188,12 +188,6 @@ Three sinks ship today:
 - **`--sink kafka`** — produces JSON to a Kafka broker via `kafka-python`. The table name is used as the message key so partitioning stays consistent per table. See `sinks/kafka.py`.
 - **`--sink kustainer`** — ingests directly into [Kustainer](https://learn.microsoft.com/en-us/azure/data-explorer/kusto-emulator-overview), Microsoft's official Kusto/ADX emulator, via the `azure-kusto-data` SDK. Each event lands in the table named after its Pydantic model (e.g. `CloudAppEvents`). The emulator does not implement streaming or queued ingestion, so the sink uses the universally-supported `.ingest inline` control command on the engine endpoint. See `sinks/kustainer.py`.
 
-##### Adding a new sink
-
-1. Drop a module in `sinks/` (e.g. `sinks/s3.py`) that exports a class implementing the `Sink` protocol from `sinks/base.py` plus a top-level `build(...)` factory returning an instance.
-2. Add an entry to the `SinkChoice` enum in `main.py` and a branch in `_build_sink` that calls your factory with the relevant CLI flags.
-3. Add CLI flags for any sink-specific config (mirror the `--kafka-*` pattern), and a unit test in `tests/test_sinks.py` that stubs out the underlying client so it doesn't need real infrastructure.
-
 ##### Testing the Kafka sink locally
 
 A [`docker/docker-compose-kafka.yml`](./docker/docker-compose-kafka.yml) spins up a single-broker Kafka (KRaft mode, no Zookeeper) plus [Kafka UI](https://github.com/provectus/kafka-ui) so you can watch topics fill up:
@@ -353,3 +347,9 @@ uv run pytest tests/test_telemetry.py::test_identity_logon_events_terminate_at_a
 # Quieter output
 uv run pytest -q
 ```
+
+### Adding a new sink
+
+1. Drop a module in `sinks/` (e.g. `sinks/s3.py`) that exports a class implementing the `Sink` protocol from `sinks/base.py` plus a top-level `build(...)` factory returning an instance.
+2. Add an entry to the `SinkChoice` enum in `main.py` and a branch in `_build_sink` that calls your factory with the relevant CLI flags.
+3. Add CLI flags for any sink-specific config (mirror the `--kafka-*` pattern), and a unit test in `tests/test_sinks.py` that stubs out the underlying client so it doesn't need real infrastructure.
