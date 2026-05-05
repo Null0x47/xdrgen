@@ -76,7 +76,7 @@ def test_world_collections_are_tuples():
 
 
 def test_world_is_hashable():
-    """Hashable so `@lru_cache(corpus_for(world))` works."""
+    """Hashable so `@lru_cache(pool_for(world))` works."""
     a = World()
     b = World()
     assert hash(a) == hash(b)

@@ -51,7 +51,7 @@ from generators.device_registry_events import (
     generate as generate_device_registry,
 )
 from generators.email_attachment_info import generate as generate_email_attachment
-from generators.email_corpus import corpus_for
+from generators.email_pool import pool_for
 from generators.email_events import generate as generate_email_events
 from generators.email_post_delivery_events import (
     generate as generate_email_post_delivery,
@@ -485,28 +485,69 @@ def test_identity_account_info_sid_uses_shared_prefix_when_present(_world):
 
 
 @pytest.fixture(scope="session")
-def _corpus(_world):
-    return corpus_for(_world)
+def _pool(_world):
+    return pool_for(_world)
 
 
 @pytest.fixture(scope="session")
-def _pool_nm_ids(_corpus):
-    return {e["network_message_id"] for e in _corpus.entries}
+def _pool_nm_ids(_pool):
+    return {e["network_message_id"] for e in _pool.entries}
 
 
 @pytest.fixture(scope="session")
-def _pool_nm_ids_with_attachments(_corpus):
-    return {e["network_message_id"] for e in _corpus.entries if e["attachments"]}
+def _pool_nm_ids_with_attachments(_pool):
+    return {e["network_message_id"] for e in _pool.entries if e["attachments"]}
 
 
 @pytest.fixture(scope="session")
-def _pool_nm_ids_with_urls(_corpus):
-    return {e["network_message_id"] for e in _corpus.entries if e["urls"]}
+def _pool_nm_ids_with_urls(_pool):
+    return {e["network_message_id"] for e in _pool.entries if e["urls"]}
 
 
 @pytest.fixture(scope="session")
-def _phish_nm_ids(_corpus):
-    return {e["network_message_id"] for e in _corpus.entries if e["threat_types"]}
+def _phish_nm_ids(_pool):
+    return {e["network_message_id"] for e in _pool.entries if e["threat_types"]}
+
+
+def test_email_templates_override_replaces_pool():
+    """An `email_templates:` override flows into every Email* / UrlClick row."""
+    from world import EmailTemplate, EmailUrl, Overrides, Profile
+
+    only_template = EmailTemplate(
+        subject="Northwind Lab — single test mail",
+        sender_display_name="Northwind Lab",
+        sender_from_address="lab@northwind.com",
+        sender_from_domain="northwind.com",
+        sender_mail_from_address="lab@northwind.com",
+        sender_mail_from_domain="northwind.com",
+        recipient_persona="avery.chen",
+        direction="Inbound",
+        delivery_action="Delivered",
+        delivery_location="Inbox",
+        email_action="No action taken",
+        email_size=10000,
+        bulk_complaint_level=0,
+        authentication_details="SPF=pass; DKIM=pass; DMARC=pass; CompAuth=pass",
+        confidence_level='{"Spam":"-1"}',
+        urls=(
+            EmailUrl(
+                url="https://northwind.com/lab",
+                domain="northwind.com",
+                location="Body",
+            ),
+        ),
+    )
+    prof = Profile(
+        tables=["EmailEvents"],
+        overrides=Overrides(email_templates=[only_template]),
+    )
+    world = prof.build_world()
+
+    assert len(world.email_templates) == 1
+    for _ in range(50):
+        event = generate_email_events(world)
+        assert event.Subject == "Northwind Lab — single test mail"
+        assert event.SenderFromDomain == "northwind.com"
 
 
 def test_email_events_round_trips_through_model(_world):
@@ -550,9 +591,7 @@ def test_every_email_table_uses_a_pool_network_message_id(
     _pool_nm_ids_with_attachments,
     _pool_nm_ids_with_urls,
 ):
-    """Each Email* / UrlClickEvents row must reference a NetworkMessageId
-    from the shared corpus — that is the property that lets an analyst
-    pivot from any one row to every related row."""
+    """Every Email*/UrlClick row references a NetworkMessageId in the pool."""
     for _ in range(50):
         assert generate_email_events(_world).NetworkMessageId in _pool_nm_ids
         assert generate_email_post_delivery(_world).NetworkMessageId in _pool_nm_ids
@@ -574,7 +613,7 @@ def test_email_attachment_info_carries_attachment_specific_fields(_world):
         int(event.SHA256, 16)
 
 
-def test_email_correlation_holds_across_tables(_world, _corpus):
+def test_email_correlation_holds_across_tables(_world, _pool):
     """Same NetworkMessageId appears across multiple Email*/UrlClick tables."""
     by_nm_id: dict[str, set[str]] = {}
     for _ in range(60):
@@ -594,7 +633,7 @@ def test_email_correlation_holds_across_tables(_world, _corpus):
     assert multi_table_ids, (
         "expected at least one NetworkMessageId to appear in >= 2 tables"
     )
-    assert len(multi_table_ids) >= len(_corpus.entries) // 2
+    assert len(multi_table_ids) >= len(_pool.entries) // 2
 
 
 def test_email_post_delivery_for_phish_uses_admin_or_zap_trigger(_world, _phish_nm_ids):
@@ -608,10 +647,10 @@ def test_email_post_delivery_for_phish_uses_admin_or_zap_trigger(_world, _phish_
     assert saw_phish, "expected the phishing email to be sampled at least once"
 
 
-def test_url_click_recipient_matches_email_recipient(_world, _corpus):
+def test_url_click_recipient_matches_email_recipient(_world, _pool):
     """UrlClickEvents joins EmailEvents on (NetworkMessageId, AccountUpn)."""
     nm_to_recipient = {
-        e["network_message_id"]: e["recipient"].upn for e in _corpus.entries
+        e["network_message_id"]: e["recipient"].upn for e in _pool.entries
     }
     for _ in range(50):
         event = generate_url_click(_world)

@@ -326,3 +326,62 @@ overrides:
     - code: 700016
       weight: 1
       description: "UnauthorizedClient_DoesNotMatchAuthorizedParty: Application not found in the directory."
+
+  # Pre-built emails feeding the Email* / UrlClickEvents generators. All five
+  # tables draw from this pool so rows pivot on NetworkMessageId. recipient_persona
+  # matches a users[].sam_account_name (with hash-index fallback). Attachment
+  # SHA-256s and message-ids are minted at runtime; don't set them.
+  email_templates:
+    - subject: "Northwind invoice 901 - February"
+      sender_display_name: Northwind Billing
+      sender_from_address: billing@northwind-supplier.com
+      sender_from_domain: northwind-supplier.com
+      sender_mail_from_address: billing@bounces.northwind-supplier.com
+      sender_mail_from_domain: bounces.northwind-supplier.com
+      sender_ipv4: 198.51.100.42
+      recipient_persona: avery.chen
+      direction: Inbound
+      delivery_action: Delivered
+      delivery_location: Inbox
+      email_action: No action taken
+      email_size: 24112
+      bulk_complaint_level: 2
+      authentication_details: "SPF=pass; DKIM=pass; DMARC=pass; CompAuth=pass"
+      confidence_level: '{"Spam":"1"}'
+      attachments:
+        - file_name: invoice_901.pdf
+          extension: pdf
+          file_type: PDF Document
+          file_size: 18204
+      urls:
+        - url: https://billing.northwind-supplier.com/pay/901
+          domain: billing.northwind-supplier.com
+          location: Body
+
+    - subject: "Action required: verify your Northwind account"
+      sender_display_name: Northwind IT
+      sender_from_address: no-reply@northwind-update.io
+      sender_from_domain: northwind-update.io
+      sender_mail_from_address: bounce@northwind-update.io
+      sender_mail_from_domain: northwind-update.io
+      sender_ipv4: 185.244.25.121
+      recipient_persona: sam.rivera
+      direction: Inbound
+      delivery_action: Blocked
+      delivery_location: Quarantine
+      email_action: Send to quarantine
+      email_action_policy: Anti-phishing user impersonation
+      email_action_policy_guid: 8d2d8c45-2f9f-4c5e-8b1a-1c12fbb1d9e6
+      email_size: 17204
+      bulk_complaint_level: 1
+      authentication_details: "SPF=fail; DKIM=none; DMARC=fail; CompAuth=fail (reason=000)"
+      confidence_level: '{"Phish":"High"}'
+      threat_types: Phish
+      threat_names: "Phish:HTML/Generic.A"
+      threat_classification: Credential phishing
+      detection_methods: "URL detonation reputation, Heuristic clustering"
+      is_first_contact: true
+      urls:
+        - url: https://northwind-update.io/verify?u=sam.rivera
+          domain: northwind-update.io
+          location: Body

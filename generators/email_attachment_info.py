@@ -5,13 +5,13 @@ import random
 from models import EmailAttachmentInfo
 from generators.base import register
 from generators.common import now_utc
-from generators.email_corpus import corpus_for
+from generators.email_pool import pool_for
 from world import World
 
 
 @register("EmailAttachmentInfo")
 def generate(world: World) -> EmailAttachmentInfo:
-    email = corpus_for(world).pick_with_attachments()
+    email = pool_for(world).pick_with_attachments()
     attachment = random.choice(email["attachments"])
     recipient = email["recipient"]
     timestamp = now_utc()

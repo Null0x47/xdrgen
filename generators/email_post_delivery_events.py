@@ -5,7 +5,7 @@ import random
 from models import EmailPostDeliveryEvents
 from generators.base import register
 from generators.common import now_utc
-from generators.email_corpus import corpus_for
+from generators.email_pool import pool_for
 from world import World
 
 # Post-delivery actions: ZAP, admin remediation, and user reclassification.
@@ -50,7 +50,7 @@ _POST_DELIVERY_PATHS = [
 
 @register("EmailPostDeliveryEvents")
 def generate(world: World) -> EmailPostDeliveryEvents:
-    email = corpus_for(world).pick()
+    email = pool_for(world).pick()
 
     # Phishing verdicts → ZAP / admin paths; otherwise any path.
     if email["threat_types"]:

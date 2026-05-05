@@ -5,13 +5,13 @@ import random
 from models import EmailUrlInfo
 from generators.base import register
 from generators.common import now_utc
-from generators.email_corpus import corpus_for
+from generators.email_pool import pool_for
 from world import World
 
 
 @register("EmailUrlInfo")
 def generate(world: World) -> EmailUrlInfo:
-    email = corpus_for(world).pick_with_urls()
+    email = pool_for(world).pick_with_urls()
     url = random.choice(email["urls"])
     timestamp = now_utc()
 

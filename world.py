@@ -156,6 +156,61 @@ class WeightedErrorCode(BaseModel):
     description: Optional[str] = None
 
 
+class EmailAttachment(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    file_name: str
+    extension: str
+    file_type: str
+    file_size: int
+
+
+class EmailUrl(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    url: str
+    domain: str
+    location: str  # Body | Subject | Attachment
+
+
+class EmailTemplate(BaseModel):
+    """One pre-built email feeding the Email* / UrlClickEvents generators.
+    `recipient_persona` matches a `users[].sam_account_name` (with hash-index
+    fallback). NetworkMessageId, InternetMessageId and SHA-256s are minted
+    at runtime by `EmailPool`."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    subject: str
+    sender_display_name: str
+    sender_from_address: str
+    sender_from_domain: str
+    sender_mail_from_address: str
+    sender_mail_from_domain: str
+    sender_object_id: Optional[str] = None
+    sender_ipv4: Optional[str] = None
+    sender_ipv6: Optional[str] = None
+    recipient_persona: str
+    direction: str  # Inbound | Outbound | Intra-org
+    delivery_action: str
+    delivery_location: str
+    email_action: str
+    email_action_policy: Optional[str] = None
+    email_action_policy_guid: Optional[str] = None
+    email_size: int
+    bulk_complaint_level: int
+    authentication_details: str
+    confidence_level: str
+    threat_types: Optional[str] = None
+    threat_names: Optional[str] = None
+    threat_classification: Optional[str] = None
+    detection_methods: Optional[str] = None
+    is_first_contact: bool = False
+    language: str = "en"
+    attachments: tuple[EmailAttachment, ...] = ()
+    urls: tuple[EmailUrl, ...] = ()
+
+
 _DEFAULT_DOMAIN_CONTROLLERS: tuple[DomainController, ...] = (
     DomainController(
         name="DC01.contoso.local",
@@ -832,6 +887,282 @@ _DEFAULT_ENTRA_SPN_SIGN_IN_ERROR_CODES: tuple[WeightedErrorCode, ...] = (
 )
 
 
+_DEFAULT_EMAIL_TEMPLATES: tuple[EmailTemplate, ...] = (
+    EmailTemplate(
+        subject="Invoice 8421 - Q2 services",
+        sender_display_name="Acme Billing",
+        sender_from_address="billing@acme-corp.com",
+        sender_from_domain="acme-corp.com",
+        sender_mail_from_address="billing@bounces.acme-corp.com",
+        sender_mail_from_domain="bounces.acme-corp.com",
+        sender_ipv4="203.0.113.45",
+        recipient_persona="jordan.patel",
+        direction="Inbound",
+        delivery_action="Delivered",
+        delivery_location="Inbox",
+        email_action="No action taken",
+        email_size=28412,
+        bulk_complaint_level=4,
+        authentication_details="SPF=pass; DKIM=pass; DMARC=pass; CompAuth=pass",
+        confidence_level='{"Spam":"1"}',
+        attachments=(
+            EmailAttachment(
+                file_name="invoice_8421.pdf",
+                extension="pdf",
+                file_type="PDF Document",
+                file_size=24813,
+            ),
+        ),
+        urls=(
+            EmailUrl(
+                url="https://billing.acme-corp.com/pay/8421",
+                domain="billing.acme-corp.com",
+                location="Body",
+            ),
+            EmailUrl(
+                url="https://acme-corp.com/policy",
+                domain="acme-corp.com",
+                location="Body",
+            ),
+        ),
+    ),
+    EmailTemplate(
+        subject="[contoso/main] Pull request #482 ready for review",
+        sender_display_name="GitHub",
+        sender_from_address="noreply@github.com",
+        sender_from_domain="github.com",
+        sender_mail_from_address="bounces+482@sgmail.github.com",
+        sender_mail_from_domain="sgmail.github.com",
+        sender_ipv4="140.82.114.10",
+        recipient_persona="avery.chen",
+        direction="Inbound",
+        delivery_action="Delivered",
+        delivery_location="Inbox",
+        email_action="No action taken",
+        email_size=14210,
+        bulk_complaint_level=1,
+        authentication_details="SPF=pass; DKIM=pass; DMARC=pass; CompAuth=pass",
+        confidence_level='{"Spam":"1"}',
+        urls=(
+            EmailUrl(
+                url="https://github.com/contoso/main/pull/482",
+                domain="github.com",
+                location="Body",
+            ),
+            EmailUrl(
+                url="https://github.com/settings/notifications",
+                domain="github.com",
+                location="Body",
+            ),
+        ),
+    ),
+    EmailTemplate(
+        subject="Please sign: NDA - Contoso / Northwind",
+        sender_display_name="DocuSign EU System",
+        sender_from_address="dse@eumail.docusign.net",
+        sender_from_domain="eumail.docusign.net",
+        sender_mail_from_address="dse@eumail.docusign.net",
+        sender_mail_from_domain="eumail.docusign.net",
+        sender_ipv4="162.248.184.10",
+        recipient_persona="sam.rivera",
+        direction="Inbound",
+        delivery_action="Delivered",
+        delivery_location="Inbox",
+        email_action="No action taken",
+        email_size=51201,
+        bulk_complaint_level=1,
+        authentication_details="SPF=pass; DKIM=pass; DMARC=pass; CompAuth=pass",
+        confidence_level='{"Spam":"1"}',
+        is_first_contact=True,
+        attachments=(
+            EmailAttachment(
+                file_name="NDA_Contoso_Northwind.pdf",
+                extension="pdf",
+                file_type="PDF Document",
+                file_size=48201,
+            ),
+        ),
+        urls=(
+            EmailUrl(
+                url="https://www.docusign.net/Member/EmailStart.aspx?envelopeId=abc123",
+                domain="docusign.net",
+                location="Body",
+            ),
+        ),
+    ),
+    EmailTemplate(
+        subject="Action required: Verify your Microsoft account before May 5",
+        sender_display_name="Microsoft Security",
+        sender_from_address="no-reply@securemail-update.io",
+        sender_from_domain="securemail-update.io",
+        sender_mail_from_address="bounce@securemail-update.io",
+        sender_mail_from_domain="securemail-update.io",
+        sender_ipv4="185.244.25.121",
+        recipient_persona="priya.iyer",
+        direction="Inbound",
+        delivery_action="Blocked",
+        delivery_location="Quarantine",
+        email_action="Send to quarantine",
+        email_action_policy="Anti-phishing user impersonation",
+        email_action_policy_guid="8d2d8c45-2f9f-4c5e-8b1a-1c12fbb1d9e6",
+        email_size=18394,
+        bulk_complaint_level=1,
+        authentication_details="SPF=fail; DKIM=none; DMARC=fail; CompAuth=fail (reason=000)",
+        confidence_level='{"Phish":"High"}',
+        threat_types="Phish",
+        threat_names="Phish:HTML/Generic.A",
+        threat_classification="Credential phishing",
+        detection_methods="URL detonation reputation, Heuristic clustering",
+        is_first_contact=True,
+        attachments=(
+            EmailAttachment(
+                file_name="password_reset_form.html",
+                extension="html",
+                file_type="HTML Document",
+                file_size=7821,
+            ),
+        ),
+        urls=(
+            EmailUrl(
+                url="https://securemail-update.io/verify?u=priya.iyer",
+                domain="securemail-update.io",
+                location="Body",
+            ),
+            EmailUrl(
+                url="http://malicious-redirect.example/track?m=99281",
+                domain="malicious-redirect.example",
+                location="Body",
+            ),
+        ),
+    ),
+    EmailTemplate(
+        subject="Re: Q3 forecast — updated numbers",
+        sender_display_name="Avery Chen",
+        sender_from_address="avery.chen@contoso.com",
+        sender_from_domain="contoso.com",
+        sender_mail_from_address="avery.chen@contoso.com",
+        sender_mail_from_domain="contoso.com",
+        sender_object_id="8a9b1c2d-3e4f-4061-8283-94a5b6c7d8e9",
+        recipient_persona="jordan.patel",
+        direction="Intra-org",
+        delivery_action="Delivered",
+        delivery_location="Inbox",
+        email_action="No action taken",
+        email_size=89102,
+        bulk_complaint_level=0,
+        authentication_details="SPF=pass; DKIM=pass; DMARC=pass; CompAuth=pass",
+        confidence_level='{"Spam":"-1"}',
+        attachments=(
+            EmailAttachment(
+                file_name="Q3_forecast_v3.xlsx",
+                extension="xlsx",
+                file_type="Excel Workbook",
+                file_size=64218,
+            ),
+        ),
+        urls=(
+            EmailUrl(
+                url="https://contoso-my.sharepoint.com/personal/avery_chen/Q3_forecast_v3.xlsx",
+                domain="contoso-my.sharepoint.com",
+                location="Body",
+            ),
+        ),
+    ),
+    EmailTemplate(
+        subject="Avery Chen mentioned you in #engineering",
+        sender_display_name="Microsoft Teams",
+        sender_from_address="noreply@email.teams.microsoft.com",
+        sender_from_domain="email.teams.microsoft.com",
+        sender_mail_from_address="noreply@email.teams.microsoft.com",
+        sender_mail_from_domain="email.teams.microsoft.com",
+        sender_ipv4="52.114.6.45",
+        recipient_persona="sam.rivera",
+        direction="Inbound",
+        delivery_action="Delivered",
+        delivery_location="Inbox",
+        email_action="No action taken",
+        email_size=9412,
+        bulk_complaint_level=1,
+        authentication_details="SPF=pass; DKIM=pass; DMARC=pass; CompAuth=pass",
+        confidence_level='{"Spam":"1"}',
+        urls=(
+            EmailUrl(
+                url="https://teams.microsoft.com/l/message/19:abc/1715000000000",
+                domain="teams.microsoft.com",
+                location="Body",
+            ),
+        ),
+    ),
+    EmailTemplate(
+        subject="Industry watch: 5 trends shaping Q3",
+        sender_display_name="Contoso Marketing",
+        sender_from_address="newsletter@mc.contoso-marketing.io",
+        sender_from_domain="mc.contoso-marketing.io",
+        sender_mail_from_address="bounce-mc@mc.contoso-marketing.io",
+        sender_mail_from_domain="mc.contoso-marketing.io",
+        sender_ipv4="198.2.180.45",
+        recipient_persona="avery.chen",
+        direction="Inbound",
+        delivery_action="Junked",
+        delivery_location="JunkFolder",
+        email_action="Move message to junk mail folder",
+        email_action_policy="Antispam bulk mail",
+        email_action_policy_guid="7e1c8a3b-9d2f-4d3e-b8a2-9c4e9b3d1f6a",
+        email_size=31415,
+        bulk_complaint_level=7,
+        authentication_details="SPF=pass; DKIM=pass; DMARC=pass; CompAuth=pass",
+        confidence_level='{"Spam":"5"}',
+        detection_methods="Bulk mail",
+        urls=(
+            EmailUrl(
+                url="https://mc.contoso-marketing.io/track?c=12345",
+                domain="mc.contoso-marketing.io",
+                location="Body",
+            ),
+            EmailUrl(
+                url="https://contoso-marketing.io/unsubscribe",
+                domain="contoso-marketing.io",
+                location="Body",
+            ),
+        ),
+    ),
+    EmailTemplate(
+        subject="Quarterly SOC update for Northwind",
+        sender_display_name="Sam Rivera",
+        sender_from_address="sam.rivera@contoso.com",
+        sender_from_domain="contoso.com",
+        sender_mail_from_address="sam.rivera@contoso.com",
+        sender_mail_from_domain="contoso.com",
+        sender_object_id="2c3d4e5f-6071-4293-a4b5-c6d7e8f90112",
+        sender_ipv4="73.62.18.101",
+        recipient_persona="robin.park_acme.com#EXT#",
+        direction="Outbound",
+        delivery_action="Delivered",
+        delivery_location="On-premises/External",
+        email_action="No action taken",
+        email_size=102488,
+        bulk_complaint_level=0,
+        authentication_details="SPF=pass; DKIM=pass; DMARC=pass; CompAuth=pass",
+        confidence_level='{"Spam":"-1"}',
+        attachments=(
+            EmailAttachment(
+                file_name="soc_update_northwind.pdf",
+                extension="pdf",
+                file_type="PDF Document",
+                file_size=91204,
+            ),
+        ),
+        urls=(
+            EmailUrl(
+                url="https://contoso.com/security/disclosures",
+                domain="contoso.com",
+                location="Body",
+            ),
+        ),
+    ),
+)
+
+
 _DEFAULT_CA_POLICIES: tuple[ConditionalAccessPolicy, ...] = (
     ConditionalAccessPolicy(
         id="8d2d8c45-2f9f-4c5e-8b1a-1c12fbb1d9e6",
@@ -881,6 +1212,7 @@ class World(BaseModel):
     entra_spn_sign_in_error_codes: tuple[WeightedErrorCode, ...] = (
         _DEFAULT_ENTRA_SPN_SIGN_IN_ERROR_CODES
     )
+    email_templates: tuple[EmailTemplate, ...] = _DEFAULT_EMAIL_TEMPLATES
 
 
 class Overrides(BaseModel):
@@ -907,6 +1239,7 @@ class Overrides(BaseModel):
     conditional_access_policies: Optional[list[ConditionalAccessPolicy]] = None
     entra_sign_in_error_codes: Optional[list[WeightedErrorCode]] = None
     entra_spn_sign_in_error_codes: Optional[list[WeightedErrorCode]] = None
+    email_templates: Optional[list[EmailTemplate]] = None
 
 
 class Profile(BaseModel):

@@ -7,7 +7,7 @@ import uuid
 from models import UrlClickEvents
 from generators.base import register
 from generators.common import now_utc
-from generators.email_corpus import corpus_for
+from generators.email_pool import pool_for
 from world import World
 
 # Tied to a pool email so rows pivot to EmailEvents / EmailUrlInfo via
@@ -45,7 +45,7 @@ def _redirect_chain(url: str) -> str:
 
 @register("UrlClickEvents")
 def generate(world: World) -> UrlClickEvents:
-    email = corpus_for(world).pick_with_urls()
+    email = pool_for(world).pick_with_urls()
     url_entry = random.choice(email["urls"])
     recipient = email["recipient"]
     ip = random.choice(world.ips)

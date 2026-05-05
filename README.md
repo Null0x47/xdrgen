@@ -156,6 +156,7 @@ The profile is validated by Pydantic models defined in [`world.py`](./world.py) 
 | `conditional_access_policies` | **`id`**, **`displayName`**, `enforcedGrantControls`, `enforcedSessionControls` | `EntraIdSignInEvents.ConditionalAccessPolicies` |
 | `entra_sign_in_error_codes` | **`code`**, **`weight`**, `description` | `EntraIdSignInEvents.ErrorCode` distribution + `AuthenticationProcessingDetails` |
 | `entra_spn_sign_in_error_codes` | **`code`**, **`weight`**, `description` | `EntraIdSpnSignInEvents.ErrorCode` distribution |
+| `email_templates` | **`subject`**, **`sender_*`**, **`recipient_persona`**, **`direction`**, **`delivery_action`**, **`delivery_location`**, **`email_action`**, **`email_size`**, **`bulk_complaint_level`**, **`authentication_details`**, **`confidence_level`**, optional threat / policy fields, plus nested `attachments` (**`file_name`**, **`extension`**, **`file_type`**, **`file_size`**) and `urls` (**`url`**, **`domain`**, **`location`**) | Pre-built email pool feeding `EmailEvents` / `EmailAttachmentInfo` / `EmailPostDeliveryEvents` / `EmailUrlInfo` / `UrlClickEvents` (correlated by `NetworkMessageId`) |
 
 A fully documented example profile is shipped at the repo root as [`profile.example.yaml`](./profile.example.yaml) with sample values for every override — copy it and edit:
 

@@ -95,9 +95,9 @@ The eight Device* generators (`DeviceEvents`, `DeviceProcessEvents`, `DeviceLogo
 
 ### `EmailEvents` / `EmailAttachmentInfo` / `EmailPostDeliveryEvents` / `EmailUrlInfo` / `UrlClickEvents` (correlated by `NetworkMessageId`)
 
-These five tables are the email side of Defender XDR and are designed to be **pivotable on `NetworkMessageId`** — given any one row, an analyst can join to every related row in the other four tables. To make that work, the generators all draw from a shared corpus ([`email_corpus.py`](./email_corpus.py)) of pre-built emails. Each pool entry carries everything any of the five tables needs: sender / recipient identities, attachments (with stable per-filename SHA-256s), embedded URLs, threat verdict, delivery action, and `NetworkMessageId` itself.
+These five tables are the email side of Defender XDR and are designed to be **pivotable on `NetworkMessageId`** — given any one row, an analyst can join to every related row in the other four tables. To make that work, the generators all draw from a shared pool ([`email_pool.py`](./email_pool.py)) of pre-built emails. Each pool entry carries everything any of the five tables needs: sender / recipient identities, attachments (with stable per-filename SHA-256s), embedded URLs, threat verdict, delivery action, and `NetworkMessageId` itself.
 
-The corpus covers a realistic mix:
+The pool covers a realistic mix:
 
 - routine vendor mail (Acme Billing, DocuSign) — clean, delivered to Inbox
 - platform notifications (GitHub PR, Microsoft Teams mention) — clean, no attachments
@@ -108,7 +108,7 @@ The corpus covers a realistic mix:
 
 Per table:
 
-- **`EmailEvents`** — full email metadata including `AuthenticationDetails` (SPF / DKIM / DMARC / CompAuth pass-fail breakdown), `BulkComplaintLevel`, `ConfidenceLevel`, `DeliveryAction` / `DeliveryLocation`, `EmailAction` / `EmailActionPolicy`, `IsFirstContact`, `AttachmentCount` / `UrlCount` derived from the corpus.
+- **`EmailEvents`** — full email metadata including `AuthenticationDetails` (SPF / DKIM / DMARC / CompAuth pass-fail breakdown), `BulkComplaintLevel`, `ConfidenceLevel`, `DeliveryAction` / `DeliveryLocation`, `EmailAction` / `EmailActionPolicy`, `IsFirstContact`, `AttachmentCount` / `UrlCount` derived from the pool.
 - **`EmailAttachmentInfo`** — one row per pulled attachment, with file name, extension, type, size, and a stable SHA-256 (so the same attachment hashes the same across runs).
 - **`EmailPostDeliveryEvents`** — ZAP / manual-remediation / user-reported-not-junk paths. When the underlying email already carries a phishing verdict, the action is forced to a ZAP or admin-triggered path (a user can't "Move to inbox" an email that was quarantined as phish).
 - **`EmailUrlInfo`** — one row per embedded URL, with `Url`, `UrlDomain`, and `UrlLocation` (Body / Subject / Attachment).

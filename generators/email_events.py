@@ -5,13 +5,13 @@ import random
 from models import EmailEvents
 from generators.base import register
 from generators.common import now_utc
-from generators.email_corpus import corpus_for
+from generators.email_pool import pool_for
 from world import World
 
 
 @register("EmailEvents")
 def generate(world: World) -> EmailEvents:
-    email = corpus_for(world).pick()
+    email = pool_for(world).pick()
     recipient = email["recipient"]
     timestamp = now_utc()
 
