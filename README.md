@@ -12,7 +12,26 @@ It does two things:
 ## Requirements
 
 - Python 3.12+
-- [uv](https://github.com/astral-sh/uv)
+- [uv](https://github.com/astral-sh/uv) (recommended; see [Without uv](#without-uv) for a pip-based setup)
+
+## Without uv
+
+If you'd rather not install `uv`, set up a venv with `pip` and drop the `uv run` prefix from every command in this README:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+
+xdrgen generate profile.yaml -n 100
+```
+
+Dev tooling lives under the `dev` dependency group in `pyproject.toml`. Pip doesn't install groups today, so for the test suite / linter add them by hand:
+
+```bash
+pip install pytest pytest-asyncio respx ruff
+pytest -q
+```
 
 ## Commands
 
