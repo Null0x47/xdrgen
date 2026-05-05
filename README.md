@@ -137,24 +137,24 @@ The profile is validated by Pydantic models defined in [`world.py`](./world.py) 
 | `entra_sign_in_error_codes` | **`code`**, **`weight`**, `description` | `EntraIdSignInEvents.ErrorCode` distribution + `AuthenticationProcessingDetails` |
 | `entra_spn_sign_in_error_codes` | **`code`**, **`weight`**, `description` | `EntraIdSpnSignInEvents.ErrorCode` distribution |
 
-A fully documented example profile is shipped at the repo root as [`xdrgen.example.yaml`](./xdrgen.example.yaml) with sample values for every override — copy it and edit:
+A fully documented example profile is shipped at the repo root as [`profile.example.yaml`](./profile.example.yaml) with sample values for every override — copy it and edit:
 
 ```bash
-cp xdrgen.example.yaml xdrgen.yaml
-uv run xdrgen generate xdrgen.yaml -n 100
+cp profile.example.yaml profile.yaml
+uv run xdrgen generate profile.yaml -n 100
 ```
 
 #### Examples
 
 ```bash
 # 100 events, no delay between them, into a custom file
-uv run xdrgen generate xdrgen.yaml -n 100 -i 0 -o ./out/cae.json
+uv run xdrgen generate profile.yaml -n 100 -i 0 -o ./out/cae.json
 
 # 100 events, one JSON file per event, into ./out/events/
-uv run xdrgen generate xdrgen.yaml -n 100 -i 0 -o ./out/events --per-table
+uv run xdrgen generate profile.yaml -n 100 -i 0 -o ./out/events --per-table
 
 # Stream events forever, one every 2 seconds (writes once interrupted)
-uv run xdrgen generate xdrgen.yaml --indefinite -i 2
+uv run xdrgen generate profile.yaml --indefinite -i 2
 ```
 
 #### Sinks

@@ -1,9 +1,9 @@
-# xdrgen.example.yaml
+# profile.example.yaml
 #
-# Example profile for `xdrgen generate`. Copy this file to (e.g.) `xdrgen.yaml`
+# Example profile for `xdrgen generate`. Copy this file to (e.g.) `profile.yaml`
 # and edit the lists / values to match your scenario:
 #
-#     uv run xdrgen generate xdrgen.yaml -n 100
+#     uv run xdrgen generate profile.yaml -n 100
 #
 # Two top-level keys are recognised; both are optional:
 #
