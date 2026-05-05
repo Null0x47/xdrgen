@@ -18,8 +18,7 @@ from generators.device_common import (
 from models import DeviceProcessEvents
 from world import World
 
-# DeviceProcessEvents fires once per process creation. MDE only emits a
-# `ProcessCreated` ActionType today — keep the vocabulary tight.
+# MDE only emits ProcessCreated today.
 _ACTION_TYPES = ["ProcessCreated"]
 
 

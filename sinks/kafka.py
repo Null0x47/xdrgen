@@ -1,13 +1,4 @@
-"""Kafka sink.
-
-Each event is serialised as JSON (matching the file sink's wire format) and
-produced via `kafka-python`. The table name is used as the message key so
-partitioning stays consistent per table, and `--per-table` flips routing
-from one shared topic to one topic per table named `{prefix}{TableName}`.
-
-`build()` is the public entry point — `main.py` wires it into a `MultiSink`
-when `--kafka-bootstrap` is set.
-"""
+"""Kafka sink — table name as message key; `--per-table` → one topic per table."""
 
 from __future__ import annotations
 
@@ -25,9 +16,7 @@ class KafkaSink:
         topic_prefix: str,
         producer_factory=KafkaProducer,
     ) -> None:
-        """`producer_factory` is injectable so tests can stub the producer
-        without standing up a broker. In normal use it's the real
-        `KafkaProducer` constructor."""
+        # producer_factory is injectable for tests.
         self._producer = producer_factory(
             bootstrap_servers=[s.strip() for s in bootstrap_servers.split(",")],
             value_serializer=lambda v: v.encode("utf-8"),

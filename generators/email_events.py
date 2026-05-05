@@ -18,8 +18,7 @@ def generate(world: World) -> EmailEvents:
     threat_types = email["threat_types"]
     delivery_action = email["delivery_action"]
 
-    # Org-level vs user-level policy: tenant-wide blocks (anti-phish, ETR)
-    # surface as OrgLevelPolicy; per-user blocks come from mailbox rules.
+    # Tenant-wide blocks → OrgLevelPolicy; per-user → mailbox rules.
     if email["email_action_policy"]:
         org_level_policy = email["email_action_policy"]
         org_level_action = email["email_action"]

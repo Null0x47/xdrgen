@@ -8,10 +8,7 @@ from generators.device_common import envelope, pick_device
 from models import DeviceNetworkInfo
 from world import World
 
-# Adapter archetypes — each row in DeviceNetworkInfo represents one adapter
-# on a device. The fixture covers the common shapes a managed endpoint
-# reports (corporate Wi-Fi, wired LAN, VPN tunnel, virtual loopback for
-# WSL/Hyper-V).
+# One row per adapter — Wi-Fi, wired LAN, VPN tunnel, virtual loopback.
 _ADAPTERS = [
     {
         "name": "Wi-Fi",

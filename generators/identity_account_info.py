@@ -13,9 +13,7 @@ _AUTH_METHODS = ["Credentials", "Federated", "Hybrid"]
 
 
 def _source_providers(world: World) -> list[tuple[str, str, str]]:
-    """Source providers Defender ingests identity profile data from. The
-    Microsoft Entra ID and on-prem AD entries follow the world's tenant
-    identity so a YAML override flows through."""
+    """Identity providers Defender ingests profile data from."""
     return [
         ("Microsoft Entra ID", world.tenant_id, "Contoso"),
         ("Active Directory", world.on_prem_ad_domain, "Contoso AD"),
@@ -45,9 +43,7 @@ def generate(world: World) -> IdentityAccountInfo:
     is_service = user.type == "Application"
     is_guest = "#EXT#" in user.upn
 
-    # IdentityLinkType: System for strong-identifier matches (the common
-    # case), Manual for human-linked accounts. Manual links carry a
-    # justification comment in IdentityLinkReason.
+    # 90% strong-identifier matches; 10% human-linked.
     if random.random() < 0.9:
         link_type = "Strong identifiers"
         link_reason = "Matched on objectId + UPN"

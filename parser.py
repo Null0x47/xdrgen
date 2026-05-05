@@ -22,11 +22,7 @@ class TableDef:
 
 
 def parse_xdr_table_names(reference_csvs: list[str]) -> set[str]:
-    """Union of table names whose `category` marks them as Defender XDR / MDE.
-
-    Accepts multiple CSV texts so the catalogue can be assembled from several
-    overlapping reference files.
-    """
+    """Union of XDR / MDE / Defender table names across reference CSVs."""
     names: set[str] = set()
     for text in reference_csvs:
         for row in csv.DictReader(StringIO(text)):
@@ -37,7 +33,7 @@ def parse_xdr_table_names(reference_csvs: list[str]) -> set[str]:
 
 
 def parse_xdr_tables(schemas_csv: str, xdr_table_names: set[str]) -> list[TableDef]:
-    """Group rows of table_schemas.csv into TableDef objects, keeping only XDR tables."""
+    """Group schema rows into TableDefs, keeping only XDR tables."""
     reader = csv.DictReader(StringIO(schemas_csv))
     tables: dict[str, TableDef] = {}
     for row in reader:

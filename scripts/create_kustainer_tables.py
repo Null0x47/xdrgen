@@ -1,19 +1,4 @@
-"""Create one Kustainer table per generated Pydantic model.
-
-Run this once after spinning up the emulator (see
-`docker/docker-compose-kustainer.yml`) and before pointing
-`xdrgen generate --sink kustainer` at it.
-
-The script walks every `BaseModel` exported by the `models` package, derives
-each Kusto column type from the field annotation, and issues a
-`.create-merge table` control command. `.create-merge` is idempotent: re-runs
-add new columns that have appeared in the model since the last run without
-dropping existing data, which keeps it safe to invoke after each
-`xdrgen update-models` refresh.
-
-This script is deliberately not a Typer command on the `xdrgen` CLI — bringing
-up infrastructure is operator work, not part of the generator surface.
-"""
+"""Create one Kustainer table per Pydantic model via idempotent `.create-merge`."""
 
 from __future__ import annotations
 

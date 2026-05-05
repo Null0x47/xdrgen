@@ -1,17 +1,4 @@
-"""Shared infrastructure for the `Device*` table generators.
-
-Defender for Endpoint events all share the same envelope shape: a `DeviceId`
-/ `DeviceName` / `MachineGroup` triple plus an `InitiatingProcess*` block
-that describes the process that produced the event. The helpers here map a
-`World` device → user → process so the eight generators stay consistent —
-the same `cmd.exe` always reports the same SHA-1, the same
-`primary_user_upn` is biased to show up on its device's events, etc.
-
-The catalogue of processes lives on the `World` (`world.processes`) so the
-YAML profile can replace it. The default pool covers the binaries Defender
-actually surfaces as initiators (Explorer, cmd, PowerShell, svchost,
-Chrome, Edge, Outlook, Word, Defender, rundll32) — see `world.py`.
-"""
+"""Shared envelope + InitiatingProcess helpers for Device* generators."""
 
 from __future__ import annotations
 
@@ -30,9 +17,7 @@ def _hash_for(seed: str, algo: str, length: int) -> str:
 
 
 def hashes_for(file_name: str) -> tuple[str, str, str]:
-    """(md5, sha1, sha256). Stable per `file_name` across the run so analysts
-    pivoting on `MsMpEng.exe` always see the same hashes regardless of which
-    Device* table the row came from."""
+    """(md5, sha1, sha256), stable per file_name so cross-table pivots agree."""
     seed = f"xdrgen|{file_name}"
     return (
         _hash_for(seed, "md5", 32),
@@ -50,11 +35,7 @@ def pick_device(world: World) -> Device:
 
 
 def pick_user_for_device(world: World, device: Device) -> User:
-    """Bias the picked user toward the device's `primary_user_upn` so events
-    on Avery's laptop usually carry Avery's account context. Fall back to a
-    random world user when the bias roll fails or the device has no primary
-    user — that models shared / unattended endpoints (file servers, build
-    boxes) and the occasional secondary login."""
+    """75% bias to the device's primary_user_upn; otherwise any world user."""
     if device.primary_user_upn is not None:
         primary = next(
             (u for u in world.users if u.upn == device.primary_user_upn), None
@@ -78,17 +59,7 @@ def initiating_process_fields(
     logon_id: Optional[int] = None,
     signature_fields: bool = False,
 ) -> dict:
-    """Return the universal `InitiatingProcess*` columns + the optional
-    extras that some Device* tables carry.
-
-    `integrity_and_elevation` adds `InitiatingProcessIntegrityLevel` and
-    `InitiatingProcessTokenElevation` (DeviceProcessEvents,
-    DeviceLogonEvents, DeviceNetworkEvents, DeviceImageLoadEvents,
-    DeviceRegistryEvents). `logon_id` populates `InitiatingProcessLogonId`
-    (only DeviceEvents and DeviceProcessEvents). `signature_fields` adds
-    `InitiatingProcessSignatureStatus` / `InitiatingProcessSignerType`
-    (only DeviceProcessEvents).
-    """
+    """Universal InitiatingProcess* columns plus optional per-table extras."""
     proc = pick_process(world)
     md5, sha1, sha256 = hashes_for(proc.file_name)
     pid = random.randint(500, 30000)
@@ -141,9 +112,7 @@ def initiating_process_fields(
 
 
 def envelope(world: World, device: Device) -> dict:
-    """The DeviceId / DeviceName / MachineGroup / TenantId / SourceSystem /
-    TimeGenerated common to every Device* row. Generators add `Type` and the
-    table-specific columns themselves."""
+    """Common Device* columns; generators add Type + table-specific fields."""
     return {
         "DeviceId": device.device_id,
         "DeviceName": device.device_name,

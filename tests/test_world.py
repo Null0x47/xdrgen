@@ -27,8 +27,6 @@ def test_default_world_has_baked_in_fixtures():
     assert len(w.resources) == 6
     assert len(w.groups) == 6
     assert len(w.conditional_access_policies) == 3
-    # Default Entra error-code catalogues are populated and 0 (success) sits
-    # at the head of each, dominating the weighted distribution.
     assert len(w.entra_sign_in_error_codes) >= 10
     assert len(w.entra_spn_sign_in_error_codes) >= 5
     assert w.entra_sign_in_error_codes[0].code == 0
@@ -55,7 +53,6 @@ def test_weighted_error_code_overrides_replace_defaults():
     w = prof.build_world()
     assert len(w.entra_sign_in_error_codes) == 2
     assert w.entra_sign_in_error_codes[1].weight == 99
-    # Default SPN catalogue is untouched.
     assert len(w.entra_spn_sign_in_error_codes) >= 5
 
 
@@ -71,7 +68,7 @@ def test_world_is_frozen():
 
 
 def test_world_collections_are_tuples():
-    """Tuples (not lists) make World hashable and prevent in-place mutation."""
+    """Tuples make World hashable + immutable."""
     w = World()
     assert isinstance(w.users, tuple)
     assert isinstance(w.ips, tuple)
@@ -79,11 +76,11 @@ def test_world_collections_are_tuples():
 
 
 def test_world_is_hashable():
-    """Hashability is what makes `@lru_cache(corpus_for(world))` viable."""
+    """Hashable so `@lru_cache(corpus_for(world))` works."""
     a = World()
     b = World()
     assert hash(a) == hash(b)
-    assert {a, b} == {a}  # set deduplicates equal Worlds
+    assert {a, b} == {a}
 
 
 def test_profile_build_world_with_no_overrides_returns_default():
@@ -93,9 +90,7 @@ def test_profile_build_world_with_no_overrides_returns_default():
 
 
 def test_profile_tables_is_optional():
-    """Both `tables:` and the entire profile are optional — an overrides-only
-    YAML must validate cleanly so users can ship overrides without restating
-    the whole table list."""
+    """`tables:` is optional — overrides-only profiles validate."""
     prof = Profile()
     assert prof.tables is None
     prof2 = Profile.model_validate({"overrides": {"tenant_domain": "northwind.com"}})
@@ -110,7 +105,6 @@ def test_profile_build_world_applies_scalar_override():
     )
     w = prof.build_world()
     assert w.tenant_id == "99999999-aaaa-bbbb-cccc-dddddddddddd"
-    # Untouched fields keep their defaults.
     assert w.tenant_domain == "contoso.com"
     assert len(w.users) == 6
 
@@ -132,7 +126,6 @@ def test_profile_build_world_replaces_collection_when_supplied():
     w = prof.build_world()
     assert len(w.users) == 1
     assert w.users[0].upn == "lonely.admin@northwind.com"
-    # Other collections still default.
     assert len(w.ips) == 6
 
 
@@ -154,8 +147,7 @@ def test_user_rejects_unknown_keys():
 
 
 def test_user_minimum_required_fields():
-    """display_name, upn, object_id are the only required fields — type
-    defaults to Regular and the rest are Optional."""
+    """Only display_name/upn/object_id are required; type defaults to Regular."""
     u = User(
         display_name="Tiny",
         upn="tiny@x",

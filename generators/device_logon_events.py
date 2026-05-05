@@ -13,11 +13,7 @@ from generators.device_common import (
 from models import DeviceLogonEvents
 from world import World
 
-# Defender for Endpoint LogonType vocabulary. Weights bias toward the
-# everyday cases on managed endpoints (Network for share access,
-# Interactive for desktop sign-in). The set matches what `DeviceLogonEvents`
-# actually emits, which is a slightly different shape from MDI's
-# `IdentityLogonEvents`.
+# Weighted LogonType — Network/Interactive dominate on a managed endpoint.
 _LOGON_TYPES = [
     ("Network", 50),
     ("Interactive", 18),
@@ -30,9 +26,6 @@ _LOGON_TYPES = [
 ]
 _LOGON_TYPE_VALUES, _LOGON_TYPE_WEIGHTS = zip(*_LOGON_TYPES)
 
-# Authentication protocol — pair with the destination port the client
-# actually used. Kerberos / NTLM dominate; NetLogon shows up when the
-# logon was forwarded to a DC.
 _PROTOCOLS = ("Kerberos", "Ntlm", "NetLogon")
 
 _FAILURE_REASONS = (
@@ -59,8 +52,7 @@ def generate(world: World) -> DeviceLogonEvents:
     protocol = random.choice(_PROTOCOLS)
     logon_id = random.randint(100_000, 9_999_999)
 
-    # Network-style logons typically come from a remote machine. Interactive
-    # / cached-interactive ones are local and leave RemoteIP/Port null.
+    # Local logons leave RemoteIP/Port null.
     is_remote = logon_type in ("Network", "RemoteInteractive", "NetworkCleartext")
     remote_ip = ip.ip if is_remote else None
     remote_port = random.randint(49152, 65535) if is_remote else None

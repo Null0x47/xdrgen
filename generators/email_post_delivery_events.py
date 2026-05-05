@@ -8,10 +8,7 @@ from generators.common import now_utc
 from generators.email_corpus import corpus_for
 from world import World
 
-# Post-delivery actions are emitted *after* an email has already landed in a
-# mailbox — ZAP moving a message to junk, an admin manually quarantining a
-# phish, a tenant policy retroactively soft-deleting bulk mail. The Action
-# column carries the action label; ActionTrigger says who fired it.
+# Post-delivery actions: ZAP, admin remediation, and user reclassification.
 _POST_DELIVERY_PATHS = [
     {
         "action": "Move to junk",
@@ -55,9 +52,7 @@ _POST_DELIVERY_PATHS = [
 def generate(world: World) -> EmailPostDeliveryEvents:
     email = corpus_for(world).pick()
 
-    # If the email already carries a phishing verdict, bias toward ZAP /
-    # admin remediation paths. Otherwise the most realistic post-delivery
-    # event is a user "not junk" reclassification or a soft delete.
+    # Phishing verdicts → ZAP / admin paths; otherwise any path.
     if email["threat_types"]:
         path = random.choice(
             [p for p in _POST_DELIVERY_PATHS if p["trigger"] in ("ZAP", "Admin")]

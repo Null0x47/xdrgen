@@ -21,7 +21,7 @@ def test_model_name_to_filename_simple():
 
 
 def test_model_name_to_filename_consecutive_capitals():
-    # 'EntraIdSpnSignInEvents' should not collapse the SPN run into one word.
+    # SPN must not collapse into one word.
     assert (
         model_name_to_filename("EntraIdSpnSignInEvents")
         == "entra_id_spn_sign_in_events.py"
@@ -129,13 +129,11 @@ def test_generate_init_file_sorts_imports_alphabetically():
 
     content = generate_init_file(tables)
 
-    # imports first, in sorted order
     lines = [line for line in content.splitlines() if line.startswith("from .")]
     assert lines == [
         "from .alert_info import AlertInfo",
         "from .cloud_app_events import CloudAppEvents",
         "from .device_events import DeviceEvents",
     ]
-    # __all__ also sorted
     assert content.index('"AlertInfo"') < content.index('"CloudAppEvents"')
     assert content.index('"CloudAppEvents"') < content.index('"DeviceEvents"')

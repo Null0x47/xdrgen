@@ -59,7 +59,6 @@ from generators.email_post_delivery_events import (
 from generators.email_url_info import generate as generate_email_url
 from generators.entra_id_sign_in_events import generate as generate_signin
 from generators.entra_id_spn_sign_in_events import (
-    _SERVICE_PRINCIPALS,
     generate as generate_spn,
 )
 from generators.graph_api_audit_events import (
@@ -75,10 +74,8 @@ from generators.identity_query_events import generate as generate_query
 from generators.url_click_events import generate as generate_url_click
 from world import World
 
-# Snapshot the defaults from a fresh World once for compactness in the
-# many tests that just want to assert "the generated event reflects the
-# default fixtures". Tests that exercise overrides build their own World.
-_DEFAULTS = None  # populated below
+# Default-World snapshot for tests that don't exercise overrides.
+_DEFAULTS = None
 
 
 def _refs():
@@ -111,7 +108,6 @@ USERS = _refs()["USERS"]
 
 @pytest.fixture(scope="session")
 def _world() -> World:
-    """Shared default World for tests that exercise the registry contract."""
     return World()
 
 
@@ -147,7 +143,6 @@ def test_cloud_app_events_round_trips_through_model(_world):
 
     assert isinstance(event, CloudAppEvents)
     payload = event.model_dump_json(by_alias=True)
-    # Re-validating proves every field type matches the schema.
     CloudAppEvents.model_validate_json(payload)
 
 
@@ -162,7 +157,6 @@ def test_cloud_app_events_uses_known_user_and_ip(_world):
 
 
 def test_cloud_app_events_action_drives_object_type(_world):
-    # Run enough samples that we hit each action category at least once.
     seen_types: set[str] = set()
     for _ in range(200):
         event = generate_cae(_world)
@@ -173,7 +167,6 @@ def test_cloud_app_events_action_drives_object_type(_world):
         if "login" in action or "logout" in action:
             assert event.ObjectType == "Account"
 
-    # The pool covers multiple object types — confirm we aren't always the same.
     assert len(seen_types) >= 2
 
 
@@ -199,12 +192,9 @@ def test_entra_id_sign_in_events_conditional_access_is_valid_json(_world):
 
 
 def test_entra_id_sign_in_events_application_account_is_non_interactive(_world):
-    # Force-pick the Application user by sampling many events and checking the
-    # invariant whenever we hit them.
     saw_app_user = False
     for _ in range(500):
         event = generate_signin(_world)
-        # The Application-typed user has display_name 'svc-deploy'.
         if event.AccountDisplayName == "svc-deploy":
             saw_app_user = True
             assert event.LogonType == "nonInteractiveUser"
@@ -229,7 +219,7 @@ def test_entra_id_spn_sign_in_events_round_trips_through_model(_world):
 
 def test_entra_id_spn_sign_in_events_managed_identity_uses_cloud_provider_ip(_world):
     cloud_ips = {i["ip"] for i in IPS if i["category"] == "Cloud provider"}
-    mi_names = {sp["name"] for sp in _SERVICE_PRINCIPALS if sp["is_managed_identity"]}
+    mi_names = {sp.name for sp in _world.service_principals if sp.is_managed_identity}
 
     saw_mi = False
     for _ in range(500):
@@ -247,6 +237,67 @@ def test_entra_id_spn_sign_in_events_resource_tenant_matches_common(_world):
     assert event.ResourceTenantId == TENANT_ID
 
 
+def test_entra_id_spn_sign_in_events_service_principals_override():
+    """Profile service_principals override flows into generated rows."""
+    from world import Overrides, Profile, ServicePrincipal
+
+    prof = Profile(
+        tables=["EntraIdSpnSignInEvents"],
+        overrides=Overrides(
+            service_principals=[
+                ServicePrincipal(
+                    name="northwind-only-sp",
+                    id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                    app_id="11111111-2222-3333-4444-555555555555",
+                    is_managed_identity=False,
+                )
+            ]
+        ),
+    )
+    world = prof.build_world()
+
+    for _ in range(50):
+        event = generate_spn(world)
+        assert event.ServicePrincipalName == "northwind-only-sp"
+        assert event.ApplicationId == "11111111-2222-3333-4444-555555555555"
+
+
+def test_entra_id_spn_sign_in_events_resources_override_used_when_set():
+    """`resources:` override beats the SPN generator's file-local fallback."""
+    from world import Overrides, Profile, Resource
+
+    prof = Profile(
+        tables=["EntraIdSpnSignInEvents"],
+        overrides=Overrides(
+            resources=[
+                Resource(
+                    name="Northwind LOB API",
+                    id="99999999-aaaa-bbbb-cccc-dddddddddddd",
+                )
+            ]
+        ),
+    )
+    world = prof.build_world()
+
+    for _ in range(50):
+        event = generate_spn(world)
+        assert event.ResourceDisplayName == "Northwind LOB API"
+        assert event.ResourceId == "99999999-aaaa-bbbb-cccc-dddddddddddd"
+
+
+def test_entra_id_spn_sign_in_events_resources_fallback_when_unset(_world):
+    """No override → SPN generator uses _DEFAULT_SPN_RESOURCES, not world.resources."""
+    from generators.entra_id_spn_sign_in_events import _DEFAULT_SPN_RESOURCES
+
+    fallback_names = {r.name for r in _DEFAULT_SPN_RESOURCES}
+    seen: set[str] = set()
+    for _ in range(200):
+        event = generate_spn(_world)
+        assert event.ResourceDisplayName in fallback_names
+        seen.add(event.ResourceDisplayName)
+    assert len(seen) >= 3
+
+
 def test_entra_id_sign_in_error_codes_drawn_from_world_catalogue(_world):
     valid_codes = {c.code for c in _world.entra_sign_in_error_codes}
     seen: set[int] = set()
@@ -254,15 +305,11 @@ def test_entra_id_sign_in_error_codes_drawn_from_world_catalogue(_world):
         event = generate_signin(_world)
         assert event.ErrorCode in valid_codes
         seen.add(event.ErrorCode)
-    # The expanded default list should yield several distinct codes across
-    # 500 samples; if we ever only see success the weights got broken.
     assert len(seen) >= 3
 
 
 def test_entra_id_sign_in_error_codes_override_constrains_distribution():
-    """When the YAML pins a single failure code with weight 1, every emitted
-    event must carry exactly that code — proves the override actually flows
-    through into the generator instead of getting silently ignored."""
+    """Pinning a single error code via YAML constrains every emitted event."""
     from world import Overrides, Profile, WeightedErrorCode
 
     prof = Profile(
@@ -281,7 +328,6 @@ def test_entra_id_sign_in_error_codes_override_constrains_distribution():
     for _ in range(50):
         event = generate_signin(world)
         assert event.ErrorCode == 50126
-        # Description from the override flows into AuthenticationProcessingDetails.
         assert event.AuthenticationProcessingDetails == "InvalidUserNameOrPassword"
 
 
@@ -524,16 +570,12 @@ def test_email_attachment_info_carries_attachment_specific_fields(_world):
         assert event.FileName
         assert event.FileExtension
         assert event.FileSize and event.FileSize > 0
-        # SHA-256 is hex-encoded 64 chars.
         assert event.SHA256 and len(event.SHA256) == 64
         int(event.SHA256, 16)
 
 
 def test_email_correlation_holds_across_tables(_world, _corpus):
-    """The correlation invariant: across a mixed stream of Email* /
-    UrlClickEvents events, the same NetworkMessageId appears in at least
-    two different tables. With a pool of 8 emails and 5 generators, after
-    ~250 samples this is overwhelmingly likely."""
+    """Same NetworkMessageId appears across multiple Email*/UrlClick tables."""
     by_nm_id: dict[str, set[str]] = {}
     for _ in range(60):
         for table in (
@@ -550,18 +592,13 @@ def test_email_correlation_holds_across_tables(_world, _corpus):
         nm: tables for nm, tables in by_nm_id.items() if len(tables) >= 2
     }
     assert multi_table_ids, (
-        "expected at least one NetworkMessageId to appear in >= 2 tables — "
-        "this is the whole point of pivot-by-NetworkMessageId"
+        "expected at least one NetworkMessageId to appear in >= 2 tables"
     )
-    # And in fact most pool entries should pivot across all five tables given
-    # how often we sample. Loosely require half the pool to multi-pivot.
     assert len(multi_table_ids) >= len(_corpus.entries) // 2
 
 
 def test_email_post_delivery_for_phish_uses_admin_or_zap_trigger(_world, _phish_nm_ids):
-    """When the underlying email already carries a phishing verdict, the
-    post-delivery action must come from ZAP or an admin — a user can't
-    'Move to inbox' on something that was quarantined as phish."""
+    """Phish verdicts only get ZAP / admin remediation, never user 'Move to inbox'."""
     saw_phish = False
     for _ in range(500):
         event = generate_email_post_delivery(_world)
@@ -572,8 +609,7 @@ def test_email_post_delivery_for_phish_uses_admin_or_zap_trigger(_world, _phish_
 
 
 def test_url_click_recipient_matches_email_recipient(_world, _corpus):
-    """The clicker has to be the email's recipient — UrlClickEvents joins
-    EmailEvents on (NetworkMessageId, AccountUpn)."""
+    """UrlClickEvents joins EmailEvents on (NetworkMessageId, AccountUpn)."""
     nm_to_recipient = {
         e["network_message_id"]: e["recipient"].upn for e in _corpus.entries
     }
@@ -583,8 +619,7 @@ def test_url_click_recipient_matches_email_recipient(_world, _corpus):
 
 
 def test_url_click_phish_email_blocks_the_click(_world, _phish_nm_ids):
-    """A click into a known-phish email must surface as a Blockpage / not
-    clicked-through outcome regardless of the random outcome roll."""
+    """Phish-verdict emails always surface a Block* outcome regardless of roll."""
     saw_phish = False
     for _ in range(500):
         event = generate_url_click(_world)
@@ -606,8 +641,7 @@ def test_graph_api_audit_events_round_trips_through_model(_world):
 
 
 def test_graph_api_audit_events_uses_world_identity(_world):
-    """IdentityProvider must reference the world tenant, the IP must come
-    from the world IP pool, and the application must be a known client app."""
+    """IdentityProvider/IP/app must come from the world fixtures."""
     app_ids = {a.app_id for a in _world.client_apps}
     ip_pool = {i.ip for i in _world.ips}
     for _ in range(50):
@@ -626,9 +660,7 @@ def test_graph_api_audit_events_request_uri_is_well_formed(_world):
         assert event.RequestUri.startswith("https://graph.microsoft.com/")
         assert event.RequestMethod in valid_methods
         assert event.ApiVersion in valid_versions
-        # API version embedded in the URI matches the ApiVersion column.
         assert f"/{event.ApiVersion}/" in event.RequestUri
-        # No template placeholders escaped into output.
         assert "{" not in event.RequestUri
         assert "}" not in event.RequestUri
 
@@ -643,10 +675,7 @@ def test_graph_api_audit_events_status_codes_drawn_from_known_set(_world):
 
 
 def test_graph_api_audit_events_delegated_vs_app_only_shape(_world):
-    """Delegated calls (EntityType=User) must populate AccountObjectId from
-    the world user pool. App-only calls (EntityType=ServicePrincipal) must
-    leave AccountObjectId empty — that's how real Graph audit rows separate
-    the two flows."""
+    """Delegated calls populate AccountObjectId; app-only calls leave it null."""
     user_oids = {u.object_id for u in _world.users}
     saw_user = saw_sp = False
     for _ in range(200):
@@ -665,8 +694,7 @@ def test_graph_api_audit_events_delegated_vs_app_only_shape(_world):
 
 
 def test_graph_api_audit_events_group_uri_uses_world_group_pool(_world):
-    """When the URI carries a `/groups/<id>/...` path, the id must come
-    from `world.groups`, not a freshly-minted UUID."""
+    """`/groups/<id>/...` URIs use `world.groups` ids, not fresh UUIDs."""
     valid_group_ids = {g.id for g in _world.groups}
     saw_group_uri = False
     for _ in range(500):
@@ -704,8 +732,7 @@ def test_graph_api_audit_events_group_override_constrains_uri():
 
 
 def test_graph_api_audit_events_204_has_zero_response_size(_world):
-    """A 204 No Content response, by definition, returns zero body bytes —
-    catch the day someone wires up a non-zero default for it."""
+    """204 No Content returns zero body bytes."""
     for _ in range(500):
         event = generate_graph_api(_world)
         if event.ResponseStatusCode == "204":
@@ -713,12 +740,7 @@ def test_graph_api_audit_events_204_has_zero_response_size(_world):
 
 
 def test_world_overrides_propagate_into_generated_events():
-    """A user-supplied tenant_id / tenant_domain in the YAML config must
-    show up on every generated event — that's the whole point of overrides.
-
-    Replaces the older `apply_overrides` mutation test: the contract is now
-    "build a World, pass it to the generator, the values surface" — no
-    module-level state involved."""
+    """Scalar overrides surface in every generated event."""
     from world import Overrides, Profile
 
     prof = Profile(
@@ -750,8 +772,7 @@ def test_overrides_rejects_unknown_keys():
 
 
 def test_world_overrides_replace_collections_for_subsequent_events():
-    """All collection overrides on `Overrides` must show up on the next
-    generated event — replaces the legacy in-place-mutation test."""
+    """Collection overrides surface in the very next generated event."""
     from world import Overrides, Profile
 
     prof = Profile(
@@ -835,8 +856,7 @@ def test_world_overrides_replace_collections_for_subsequent_events():
 
 
 def test_overrides_validates_user_shape():
-    """Bad shapes are caught by the Pydantic User model — caller gets a
-    validation error rather than the generator KeyError'ing later."""
+    """Bad shapes raise ValidationError, not a downstream KeyError."""
     from pydantic import ValidationError
 
     from world import Overrides
@@ -891,7 +911,7 @@ def test_device_network_events_round_trips_through_model(_world):
 
 
 def test_device_network_events_dns_uses_udp(_world):
-    """Protocol must agree with the destination port — port 53 → Udp."""
+    """Port 53 implies Udp."""
     for _ in range(200):
         event = generate_device_network(_world)
         if event.RemotePort == 53:
@@ -927,9 +947,7 @@ def test_device_file_certificate_info_round_trips_through_model(_world):
 
 
 def test_device_file_certificate_info_unsigned_files_have_no_cert_fields(_world):
-    """When `IsSigned` is False the certificate-specific fields must clear —
-    a row that says "unsigned" but still has an Issuer is internally
-    inconsistent and would mislead a hunter pivoting on signer."""
+    """IsSigned=False clears the cert-specific fields."""
     saw_unsigned = False
     for _ in range(500):
         event = generate_device_cert(_world)
@@ -949,8 +967,7 @@ def test_device_network_info_round_trips_through_model(_world):
 
 
 def test_device_network_info_ip_addresses_is_valid_json(_world):
-    """`IPAddresses` is documented as a JSON array — round-trip-decode it
-    so a downstream consumer can rely on the format."""
+    """IPAddresses is a JSON array round-trippable to a list of dicts."""
     import json
 
     for _ in range(50):
@@ -961,8 +978,7 @@ def test_device_network_info_ip_addresses_is_valid_json(_world):
 
 
 def test_device_event_uses_primary_user_for_its_device(_world):
-    """`primary_user_upn` on a `Device` should bias the `InitiatingProcess`
-    account selection toward that user when the device fires events."""
+    """primary_user_upn biases InitiatingProcess selection on its device."""
     primary_upns = {d.primary_user_upn for d in _world.devices if d.primary_user_upn}
     saw_match = False
     for _ in range(500):
@@ -979,13 +995,11 @@ def test_device_event_uses_primary_user_for_its_device(_world):
     assert saw_match, (
         "expected primary_user_upn to be picked for its own device in 500 samples"
     )
-    assert primary_upns  # sanity: defaults still wire primary users
+    assert primary_upns
 
 
 def test_processes_override_constrains_initiating_process():
-    """A `processes:` override must fully replace the default catalogue —
-    every Device* event's InitiatingProcess fields should come from the
-    pinned process. Proves the process pool is profile-configurable."""
+    """A `processes:` override fully replaces the default catalogue."""
     from world import Overrides, Process, Profile
 
     only_proc = Process(
@@ -1020,8 +1034,7 @@ def test_processes_override_constrains_initiating_process():
 
 
 def test_devices_override_replaces_world_devices():
-    """A `devices:` override in the YAML must fully replace the default
-    pool — proves devices are profile-configurable."""
+    """A `devices:` override fully replaces the default pool."""
     from world import Device, Overrides, Profile
 
     only_device = Device(
@@ -1049,6 +1062,5 @@ def test_devices_override_replaces_world_devices():
 @pytest.mark.parametrize("table", sorted(GENERATORS))
 def test_every_registered_generator_produces_a_valid_event(table, _world):
     event = GENERATORS[table](_world)
-    # If the JSON dump round-trips, the event matches its model schema.
     payload = event.model_dump_json(by_alias=True)
     type(event).model_validate_json(payload)

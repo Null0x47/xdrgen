@@ -19,9 +19,7 @@ from parser import parse_xdr_table_names, parse_xdr_tables
 try:
     from generators import GENERATORS
 except ImportError:
-    # Models package hasn't been generated yet — `update-models` will create it.
-    # Any command that actually needs generators (e.g. `generate`) will fail
-    # loudly downstream with a clearer "No generator for: ..." message.
+    # Models not generated yet; `generate` will fail loudly via _load_profile.
     GENERATORS: dict = {}
 
 from sinks import Sink
@@ -110,12 +108,7 @@ def update_models() -> None:
 
 
 def _load_profile(profile: pathlib.Path) -> Profile:
-    """Parse and validate the YAML profile into a `world.Profile`.
-
-    Validation errors (unknown keys, wrong shapes, bad types) surface as
-    `typer.BadParameter` so the CLI reports them cleanly rather than dumping
-    a Pydantic stack trace.
-    """
+    """Parse + validate a YAML profile; reports errors via typer.BadParameter."""
     raw = yaml.safe_load(profile.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise typer.BadParameter(f"{profile} must contain a top-level YAML mapping.")
@@ -149,11 +142,7 @@ def _build_sink(
     kustainer_database: str,
     kustainer_table_prefix: str,
 ) -> Sink:
-    """Build the single active sink based on the `--sink` flag.
-
-    Adding a new sink is a one-file change in `sinks/` plus a new branch and
-    `SinkChoice` enum value here.
-    """
+    """Build the active sink for `--sink`."""
     if sink_choice is SinkChoice.file:
         return file_sink.build(output, per_table=per_table)
     if sink_choice is SinkChoice.kafka:
@@ -263,10 +252,8 @@ def generate(
 ) -> None:
     """Generate production-like Defender XDR telemetry as JSON.
 
-    Events are buffered in memory and flushed to disk every `--flush-every`
-    events — so neither finite (`-n`) nor `--indefinite` runs grow memory
-    without bound. The buffer is also flushed on `Ctrl+C` and at the end of
-    a finite run, so no event written to memory is ever lost.
+    Events are buffered and flushed every --flush-every, on Ctrl+C, and at
+    end-of-run, so memory stays bounded and no event is lost.
     """
     prof = _load_profile(profile) if profile is not None else Profile()
     tables = prof.tables or sorted(GENERATORS)

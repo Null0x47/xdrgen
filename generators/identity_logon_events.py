@@ -7,24 +7,20 @@ from generators.base import register
 from generators.common import now_utc
 from world import World
 
-# Defender for Identity surfaces a fixed vocabulary on the LogonType column.
-# Weights bias toward the everyday cases (Network for SMB / share access,
-# Interactive for desktop sign-in) and leave the rarer ones thin.
+# Weighted LogonType — Network/Interactive dominate.
 _LOGON_TYPES = [
-    ("Network", 50),  # SMB / file share access — the dominant case
-    ("Interactive", 18),  # console sign-in
-    ("RemoteInteractive", 12),  # RDP
-    ("Service", 8),  # service account
-    ("Batch", 4),  # scheduled task
+    ("Network", 50),
+    ("Interactive", 18),
+    ("RemoteInteractive", 12),
+    ("Service", 8),
+    ("Batch", 4),
     ("Unlock", 4),
     ("NetworkCleartext", 2),
     ("CachedInteractive", 2),
 ]
 _LOGON_TYPE_VALUES, _LOGON_TYPE_WEIGHTS = zip(*_LOGON_TYPES)
 
-# Authentication protocol drives the destination port. Kerberos dominates in
-# a healthy AD; NTLM lingers on legacy paths; LDAP/S only show up when the
-# logon was actually a bind.
+# (protocol, destination_port, weight). Kerberos dominates a healthy AD.
 _PROTOCOLS = [
     ("Kerberos", 88, 70),
     ("Ntlm", 445, 22),
@@ -32,7 +28,6 @@ _PROTOCOLS = [
     ("LdapSecure", 636, 4),
 ]
 
-# A subset of FailureReason strings as emitted by MDI when LogonFailed fires.
 _FAILURE_REASONS = [
     "WrongPassword",
     "AccountDisabled",
@@ -53,13 +48,12 @@ def generate(world: World) -> IdentityLogonEvents:
     dc = random.choice(world.domain_controllers)
     timestamp = now_utc()
 
-    # ~92% of MDI logons succeed.
     success = random.random() < 0.92
     action_type = "LogonSuccess" if success else "LogonFailed"
 
     logon_type = random.choices(_LOGON_TYPE_VALUES, weights=_LOGON_TYPE_WEIGHTS, k=1)[0]
 
-    # Service / Batch logons skew toward Kerberos (TGT) on a healthy AD.
+    # Service / Batch logons go via Kerberos TGT.
     if logon_type in ("Service", "Batch"):
         protocol_choices = [p for p in _PROTOCOLS if p[0] == "Kerberos"]
     else:

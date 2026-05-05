@@ -25,10 +25,7 @@ async def _fetch_text(client: httpx.AsyncClient, url: str) -> str:
 
 
 async def fetch_schema_sources() -> tuple[list[str], str]:
-    """Fetch both reference CSVs and the schemas CSV concurrently.
-
-    Returns ([tables.csv text, tables_reference.csv text], table_schemas.csv text).
-    """
+    """Returns ([tables.csv, tables_reference.csv], table_schemas.csv)."""
     async with httpx.AsyncClient(follow_redirects=True) as client:
         tables_csv, reference_csv, schemas_csv = await asyncio.gather(
             _fetch_text(client, TABLES_URL),

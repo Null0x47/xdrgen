@@ -13,7 +13,7 @@ from sinks import kustainer as kustainer_sink
 
 
 class _StubEvent:
-    """Minimal BaseModel-shaped object — sinks call `.model_dump_json()`."""
+    """BaseModel stand-in — sinks only call `.model_dump_json()`."""
 
     def __init__(self, name: str) -> None:
         self._name = name
@@ -23,8 +23,7 @@ class _StubEvent:
 
 
 class _RecordingProducer:
-    """Stand-in for `kafka.KafkaProducer` so KafkaSink tests don't need a
-    broker. Only exercises the methods KafkaSink actually calls."""
+    """KafkaProducer stand-in covering the methods KafkaSink calls."""
 
     def __init__(self, **kwargs) -> None:
         self.kwargs = kwargs
@@ -103,7 +102,7 @@ def test_kafka_sink_message_key_is_table_name_and_value_is_event_json():
 
 def test_kafka_sink_splits_bootstrap_servers_on_comma():
     sink, producer = _build_kafka_sink(per_table=False)
-    assert sink  # silence unused warning — fixture call already populated kwargs
+    assert sink
     assert producer.kwargs["bootstrap_servers"] == ["broker-1:9092", "broker-2:9092"]
 
 
@@ -115,7 +114,7 @@ def test_kafka_sink_close_flushes_and_closes_producer():
 
 
 class _SampleEvent(BaseModel):
-    """Stand-in Pydantic model exercising every Kusto type the sink emits."""
+    """Exercises every Kusto type the sink emits."""
 
     Name: Optional[str] = Field(None)
     Count: Optional[int] = Field(None)
@@ -127,8 +126,7 @@ class _SampleEvent(BaseModel):
 
 
 class _RecordingKustoClient:
-    """Stand-in for `azure.kusto.data.KustoClient` so KustainerSink tests
-    don't need a running emulator."""
+    """KustoClient stand-in for KustainerSink tests."""
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, str]] = []
@@ -200,14 +198,13 @@ def test_kustainer_sink_serialises_each_kusto_type_correctly():
     _, command = client.calls[0]
     row = command.splitlines()[1]
     cells = list(_iter_csv_cells(row))
-    # Field order matches model_fields declaration order.
-    assert cells[0] == '"hello, world"'  # quoted because of comma
+    assert cells[0] == '"hello, world"'
     assert cells[1] == "42"
     assert cells[2] == "3.5"
     assert cells[3] == "true"
     assert cells[4] == "2024-01-02T03:04:05"
-    assert cells[5] == '"{""k"": ""v""}"'  # dynamic JSON, CSV-escaped
-    assert cells[6] == "alpha"  # alias-named string field
+    assert cells[5] == '"{""k"": ""v""}"'
+    assert cells[6] == "alpha"
 
 
 def test_kustainer_sink_emits_empty_cell_for_none_values():
@@ -217,7 +214,7 @@ def test_kustainer_sink_emits_empty_cell_for_none_values():
 
     _, command = client.calls[0]
     row = command.splitlines()[1]
-    assert row == ",,,,,,"  # seven fields, all empty
+    assert row == ",,,,,,"
 
 
 def test_kustainer_sink_close_closes_underlying_client():
@@ -236,12 +233,12 @@ def test_kustainer_columns_for_model_maps_pydantic_types_to_kusto_types():
         "Active": "bool",
         "Timestamp": "datetime",
         "Payload": "dynamic",
-        "type": "string",  # alias-named field uses its alias as the column name
+        "type": "string",
     }
 
 
 def _iter_csv_cells(row: str):
-    """Tiny CSV splitter for the test — handles `"` quoting with `""` escapes."""
+    """CSV splitter for the test — handles `""` escapes."""
     cell: list[str] = []
     in_quotes = False
     i = 0

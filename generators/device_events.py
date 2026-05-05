@@ -16,13 +16,8 @@ from generators.device_common import (
 from models import DeviceEvents
 from world import World
 
-# DeviceEvents is the catch-all MDE table. ActionType pulls from a wide
-# vocabulary covering Antivirus, ASR, Network Protection, Tamper Protection,
-# WDAC, AMSI, and other mixed-shape events. Each entry declares which
-# auxiliary block (file / network / registry) the event populates so the
-# row stays internally consistent.
-#
-# (action_type, shape) where shape ∈ {"file", "network", "registry", "none"}.
+# (action_type, shape) where shape ∈ {"file", "network", "registry", "none"}
+# selects which auxiliary column block the row populates.
 _ACTION_TYPES = [
     ("AntivirusDetection", "file"),
     ("AntivirusDetectionAndBlock", "file"),
@@ -57,7 +52,6 @@ def generate(world: World) -> DeviceEvents:
         world, user, logon_id=initiator_logon_id
     )
 
-    # Optional file-related fields — populated when the action surfaces a file.
     file_name = file_size = folder_path = md5 = sha1 = sha256 = None
     file_origin_ip = file_origin_url = None
     if shape == "file":
@@ -72,8 +66,6 @@ def generate(world: World) -> DeviceEvents:
         file_origin_url = "https://acme-files.example.com/share/" + file_name
         file_origin_ip = random.choice(world.ips).ip
 
-    # Optional process-creation fields — populated when DeviceEvents stands
-    # in for a sub-process spawn (e.g. Office child process blocked).
     proc_command_line = proc_creation_time = proc_id = proc_token = None
     is_proc_remote = None
     if action_type in ("AsrOfficeChildProcessBlocked", "AsrUntrustedExecutableAudited"):
@@ -89,8 +81,6 @@ def generate(world: World) -> DeviceEvents:
         proc_token = "Default"
         is_proc_remote = False
 
-    # Optional network-related fields — populated for Network Protection /
-    # browser-launched URL events.
     local_ip = local_port = remote_ip = remote_port = remote_url = None
     if shape == "network":
         local_ip = device.local_ip or f"10.10.20.{random.randint(2, 254)}"
@@ -106,7 +96,6 @@ def generate(world: World) -> DeviceEvents:
             ]
         )
 
-    # Optional registry-related fields — populated for tampering attempts.
     registry_key = registry_value_name = registry_value_data = None
     if shape == "registry":
         registry_key = r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Defender\Real-Time Protection"

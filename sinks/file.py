@@ -1,12 +1,4 @@
-"""File-based sinks.
-
-Two flavours, picked by the `per_table` flag in `build()`:
-
-- `JsonArrayFileSink` — streams every event into one JSON array file, flushed
-  on every batch so memory stays bounded across long runs.
-- `PerTableFileSink` — writes one `{TableName}-{n:04d}.json` file per event
-  inside the output directory, with `n` scoped per table.
-"""
+"""File sinks: one JSON-array file (default) or one file per event (--per-table)."""
 
 from __future__ import annotations
 
@@ -16,19 +8,7 @@ from sinks.base import Batch, Sink
 
 
 class JsonArrayFileSink:
-    """Streams events into a single JSON-array file.
-
-    Wire format:
-
-        [
-          {"<event-fields>"},
-          {"<event-fields>"}
-        ]
-
-    Each `write(batch)` appends and `flush()`es immediately, so memory stays
-    bounded regardless of run length. `close()` writes the trailing `]` and
-    is safe to call when no events were ever written (emits `[]`).
-    """
+    """Streams events into one JSON-array file; flushes per batch."""
 
     def __init__(self, output: pathlib.Path) -> None:
         if output.parent != pathlib.Path(""):
@@ -50,9 +30,7 @@ class JsonArrayFileSink:
 
 
 class PerTableFileSink:
-    """Writes one JSON file per event, named `{TableName}-{n:04d}.json` in
-    the output directory. The counter is scoped per table so filenames stay
-    stable across tables sharing the directory."""
+    """One JSON file per event: `{TableName}-{n:04d}.json` (counter is per-table)."""
 
     def __init__(self, output: pathlib.Path) -> None:
         output.mkdir(parents=True, exist_ok=True)

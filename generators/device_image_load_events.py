@@ -13,9 +13,7 @@ from generators.device_common import (
 from models import DeviceImageLoadEvents
 from world import World
 
-# Real DLLs commonly loaded on Windows. Each entry pairs the file name with
-# a typical folder, so DeviceImageLoadEvents.FolderPath stays consistent
-# with the file name (kernel32.dll lives in System32, never in Temp).
+# (dll, folder) — keeps FolderPath consistent with the file name.
 _LIBRARIES = [
     ("kernel32.dll", r"C:\Windows\System32"),
     ("ntdll.dll", r"C:\Windows\System32"),

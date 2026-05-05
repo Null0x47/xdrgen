@@ -1,18 +1,4 @@
-"""Generator for `GraphApiAuditEvents` — Microsoft Graph API audit telemetry.
-
-Each row models a single Graph API call: who called it, which endpoint, which
-HTTP method, the OAuth scope on the token, the workload that owns the
-endpoint, and the HTTP outcome. Two call shapes are produced:
-
-  * Delegated (user-context) calls — `EntityType=User`, `AccountObjectId`
-    set to the signing-in user, `ServicePrincipalId` set to the client app
-    the user authenticated through.
-  * App-only (client_credentials) calls — `EntityType=ServicePrincipal`,
-    `AccountObjectId` empty, `ServicePrincipalId` and `ApplicationId` both
-    pointing at the calling app.
-
-This mirrors how the same call appears in real Defender XDR data.
-"""
+"""GraphApiAuditEvents generator — emits delegated and app-only Graph calls."""
 
 from __future__ import annotations
 
@@ -24,10 +10,7 @@ from generators.base import register
 from generators.common import now_utc
 from world import World
 
-# Real Microsoft Graph endpoints. Each entry pairs a URI template with the
-# HTTP method, the workload that owns it, and the OAuth scope a token would
-# carry to access it. Path placeholders are substituted at runtime so each
-# event carries a fresh, well-formed Graph URL.
+# Graph endpoint catalogue: (method, uri template, owning workload, scope).
 _ENDPOINTS: tuple[dict[str, str], ...] = (
     {
         "method": "GET",
@@ -187,10 +170,7 @@ _ENDPOINTS: tuple[dict[str, str], ...] = (
     },
 )
 
-# HTTP outcomes. Successful 2xx codes dominate; the failure tail covers the
-# four codes a SOC analyst actually looks for in Graph traffic — auth
-# (401), permission (403), missing target (404), throttle (429) — plus a
-# token of 5xx errors.
+# Weighted HTTP outcomes — 2xx dominates; failure tail covers 401/403/404/429.
 _STATUS_CODES: tuple[tuple[str, int], ...] = (
     ("200", 80),
     ("201", 4),
@@ -205,7 +185,7 @@ _STATUS_CODES: tuple[tuple[str, int], ...] = (
 _STATUS_VALUES, _STATUS_WEIGHTS = zip(*_STATUS_CODES)
 
 
-# Azure regions where graph.microsoft.com requests typically terminate.
+# Azure regions graph.microsoft.com requests terminate in.
 _LOCATIONS: tuple[str, ...] = (
     "westeurope",
     "northeurope",
@@ -224,11 +204,7 @@ def generate(world: World) -> GraphApiAuditEvents:
     api_version = random.choice(("v1.0", "beta"))
     timestamp = now_utc()
 
-    # ~60% of human users issue delegated calls; service accounts always go
-    # through app-only flows. In delegated flow, both AccountObjectId (the
-    # user) and ServicePrincipalId (the app the user signed in through) are
-    # populated. In app-only flow, only the SPN is — and ApplicationId
-    # equals ServicePrincipalId because the app *is* its own caller.
+    # ~60% delegated for humans; service accounts always app-only.
     delegated = user.type != "Application" and random.random() < 0.6
     if delegated:
         entity_type = "User"
@@ -259,8 +235,7 @@ def generate(world: World) -> GraphApiAuditEvents:
     status_code = random.choices(_STATUS_VALUES, weights=_STATUS_WEIGHTS, k=1)[0]
     is_success = status_code.startswith("2")
 
-    # Reads on success return real payloads; writes return small confirmations;
-    # 204 No Content returns 0; failures return short error envelopes.
+    # GETs return larger payloads than writes; 204 = 0; failures = short envelopes.
     if not is_success:
         response_size = random.randint(80, 600)
     elif status_code == "204":

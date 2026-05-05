@@ -13,10 +13,7 @@ from main import _load_profile, app
 
 @pytest.fixture
 def runner() -> CliRunner:
-    # GitHub Actions runners set COLUMNS=0, which makes Rich (used by Typer
-    # for error rendering) wrap long flag names like `--kafka-bootstrap`
-    # mid-word and break substring assertions on error output. Pin a wide
-    # width so error text stays on one line regardless of the host env.
+    # Pin width so Rich doesn't wrap flags mid-word in CI (COLUMNS=0).
     return CliRunner(env={"COLUMNS": "200"})
 
 
@@ -30,7 +27,7 @@ def test_load_profile_accepts_known_tables(tmp_path: pathlib.Path):
 
 
 def test_load_profile_allows_missing_tables_key(tmp_path: pathlib.Path):
-    """Tables is optional — an overrides-only YAML must validate cleanly."""
+    """Overrides-only YAML validates."""
     profile = tmp_path / "no_tables.yaml"
     profile.write_text("overrides:\n  tenant_domain: northwind.com\n", encoding="utf-8")
 
@@ -101,14 +98,12 @@ def test_load_profile_rejects_users_missing_required_fields(tmp_path: pathlib.Pa
         encoding="utf-8",
     )
 
-    # display_name and object_id are required on User — pydantic must say so.
     with pytest.raises(typer.BadParameter, match="display_name|object_id"):
         _load_profile(profile)
 
 
 class _StubEvent:
-    """Stand-in BaseModel-shaped object returned by stub generators. Mirrors
-    the subset of the Pydantic v2 surface that `main._write_events` calls."""
+    """BaseModel stand-in covering the surface main._write_events calls."""
 
     def __init__(self, name: str) -> None:
         self._name = name
@@ -122,7 +117,6 @@ class _StubEvent:
 
 def _install_stub_generators(monkeypatch: pytest.MonkeyPatch) -> None:
     stub = {"CloudAppEvents": lambda _w: _StubEvent("CloudAppEvents")}
-    # main.py imports GENERATORS at module load — patch the bound name there.
     monkeypatch.setattr(main_module, "GENERATORS", stub)
 
 
@@ -171,8 +165,7 @@ def test_generate_default_output_is_telemetry_json(
     tmp_path: pathlib.Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """Without `-o`, the default file is `./telemetry.json` in cwd. Run the
-    CLI from a tmp dir so we don't pollute the repo working tree."""
+    """Default output is `./telemetry.json`."""
     _install_stub_generators(monkeypatch)
     monkeypatch.chdir(tmp_path)
 
@@ -192,10 +185,7 @@ def test_generate_flushes_buffer_periodically(
     tmp_path: pathlib.Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """Flush boundary: with `--flush-every 3` and `-n 7`, the sink must
-    receive multiple write() calls — proving events don't accumulate
-    unboundedly in memory. We verify by counting writes via a custom sink
-    that records each batch."""
+    """`--flush-every 3` + `-n 7` → batches of 3, 3, 1."""
     _install_stub_generators(monkeypatch)
 
     batches: list[int] = []
@@ -221,7 +211,6 @@ def test_generate_flushes_buffer_periodically(
     )
 
     assert result.exit_code == 0, result.output
-    # 7 events / threshold 3 → two full flushes (3, 3) plus the final remainder (1).
     assert batches == [3, 3, 1]
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert len(payload) == 7
@@ -233,7 +222,7 @@ def test_generate_flush_every_rejects_zero(
     tmp_path: pathlib.Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """`--flush-every 0` would mean never flush; Typer's `min=1` rejects it."""
+    """Typer `min=1` rejects `--flush-every 0`."""
     _install_stub_generators(monkeypatch)
     output = tmp_path / "out.json"
 
@@ -251,8 +240,7 @@ def test_generate_per_table_writes_one_file_per_event(
     tmp_path: pathlib.Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """`--per-table` treats `-o` as a directory and writes one JSON file per
-    event named `{TableName}-{n:04d}.json`, with `n` scoped per table."""
+    """`--per-table` writes one `{TableName}-{n:04d}.json` per event."""
     stub = {
         "Alpha": lambda _w: _StubEvent("Alpha"),
         "Beta": lambda _w: _StubEvent("Beta"),
@@ -268,7 +256,6 @@ def test_generate_per_table_writes_one_file_per_event(
     assert result.exit_code == 0, result.output
     files = sorted(p.name for p in out_dir.iterdir())
     assert len(files) == 20
-    # Filenames are zero-padded and per-table-counter scoped.
     by_table: dict[str, list[str]] = {}
     for name in files:
         prefix, _, _ = name.partition("-")
@@ -277,7 +264,6 @@ def test_generate_per_table_writes_one_file_per_event(
     for table, names in by_table.items():
         for i, name in enumerate(sorted(names)):
             assert name == f"{table}-{i:04d}.json"
-        # Each file is a valid JSON object that round-trips.
         sample = json.loads((out_dir / names[0]).read_text(encoding="utf-8"))
         assert sample == {"table": table}
 
@@ -287,8 +273,7 @@ def test_generate_with_overrides_only_profile_runs_all_tables(
     tmp_path: pathlib.Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """A profile with `overrides:` but no `tables:` falls back to every
-    registered generator — proves the optional-tables wiring runs end-to-end."""
+    """`overrides:`-only profile falls back to every registered generator."""
     _install_stub_generators(monkeypatch)
     profile = tmp_path / "overrides_only.yaml"
     profile.write_text("overrides:\n  tenant_domain: northwind.com\n", encoding="utf-8")
@@ -318,7 +303,6 @@ def test_generate_echo_flag_streams_lines_to_stdout(
     )
 
     assert result.exit_code == 0, result.output
-    # One stdout line per generated event, plus the start/end status lines.
     event_lines = [
         line
         for line in result.output.splitlines()
@@ -362,7 +346,6 @@ def test_generate_without_profile_uses_all_registered_generators(
     )
 
     assert result.exit_code == 0, result.output
-    # The header line lists the tables that will be sampled from.
     assert "tables=['Alpha', 'Beta']" in result.output
 
 
@@ -392,8 +375,7 @@ def test_generate_with_profile_only_uses_listed_tables(
 
 
 def _stub_kafka_build(monkeypatch: pytest.MonkeyPatch, captured: dict, sent: list):
-    """Replace `kafka_sink.build` with a stub that records the build kwargs and
-    every sent event — keeps the Kafka path testable without a broker."""
+    """Stub `kafka_sink.build` recording kwargs and sent events."""
 
     class _StubKafkaSink:
         def write(self, batch):
@@ -420,7 +402,7 @@ def test_generate_sink_kafka_routes_to_kafka_only(
     tmp_path: pathlib.Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """`--sink kafka` produces events to the broker and writes nothing to disk."""
+    """`--sink kafka` writes only to Kafka, not to disk."""
     _install_stub_generators(monkeypatch)
     sent: list[tuple[str, str]] = []
     captured: dict = {}
@@ -458,30 +440,12 @@ def test_generate_sink_kafka_routes_to_kafka_only(
     }
 
 
-# def test_generate_sink_kafka_requires_bootstrap(
-#     runner: CliRunner,
-#     tmp_path: pathlib.Path,
-#     monkeypatch: pytest.MonkeyPatch,
-# ):
-#     """`--sink kafka` without `--kafka-bootstrap` must fail fast."""
-#     _install_stub_generators(monkeypatch)
-#     output = tmp_path / "out.json"
-
-#     result = runner.invoke(
-#         app,
-#         ["generate", "-n", "1", "-i", "0", "-o", str(output), "--sink", "kafka"],
-#     )
-
-#     assert result.exit_code != 0
-#     assert "--kafka-bootstrap" in result.output
-
-
 def test_generate_sink_kafka_per_table_passes_through(
     runner: CliRunner,
     tmp_path: pathlib.Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """`--per-table` and `--kafka-topic-prefix` must reach the Kafka sink."""
+    """`--per-table` and `--kafka-topic-prefix` reach the Kafka sink."""
     stub = {
         "Alpha": lambda _w: _StubEvent("Alpha"),
         "Beta": lambda _w: _StubEvent("Beta"),
@@ -521,10 +485,10 @@ def test_generate_default_sink_is_file(
     tmp_path: pathlib.Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """No `--sink` flag → the file sink runs (and Kafka is never touched)."""
+    """No `--sink` flag → file sink is used, Kafka is not built."""
     _install_stub_generators(monkeypatch)
 
-    def fake_kafka_build(**_kw):  # would explode if kafka path were taken
+    def fake_kafka_build(**_kw):
         raise AssertionError("Kafka sink built when --sink defaulted to file.")
 
     monkeypatch.setattr(main_module.kafka_sink, "build", fake_kafka_build)

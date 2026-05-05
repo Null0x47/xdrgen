@@ -1,22 +1,11 @@
 # profile.example.yaml
 #
-# Example profile for `xdrgen generate`. Copy this file to (e.g.) `profile.yaml`
-# and edit the lists / values to match your scenario:
-#
+# Example profile for `xdrgen generate`. Copy and edit:
 #     uv run xdrgen generate profile.yaml -n 100
 #
-# Two top-level keys are recognised; both are optional:
-#
-#   tables:    the Defender XDR tables to emit telemetry for. Every entry
-#              must have a registered generator — see `xdrgen generate
-#              --help` or run with an unknown name to get the full list.
-#              Omit (or set to an empty list) to generate for every table
-#              that has a generator.
-#
-#   overrides: per-tenant fixtures that replace the defaults baked into the
-#              `World`. Keys you omit keep their defaults. List-typed
-#              overrides fully *replace* the default list — there is no
-#              merge behaviour. Unknown keys fail fast.
+# Top-level keys (both optional):
+#   tables:    tables to emit. Omit/empty = every registered generator.
+#   overrides: per-tenant fixtures. Lists fully replace defaults (no merge).
 
 tables:
   # Cloud apps & sign-ins
@@ -50,36 +39,22 @@ tables:
   - UrlClickEvents
 
 overrides:
-  # Log Analytics workspace / Microsoft Entra tenant GUID. Surfaces in the
-  # `TenantId` column of every event and in `OrganizationId` inside
-  # CloudAppEvents.RawEventData.
-  #   default: a1b2c3d4-5e6f-4071-8293-94a5b6c7d8e9
+  # Entra tenant GUID. Surfaces as TenantId / OrganizationId.
   tenant_id: 99999999-aaaa-bbbb-cccc-dddddddddddd
 
-  # Cloud / UPN domain. Used as the host part of Message-Ids for intra-org
-  # mail and a few other places.
-  #   default: contoso.com
+  # Cloud / UPN domain. Used for Message-Ids and intra-org mail.
   tenant_domain: northwind.com
 
-  # On-prem Active Directory DNS domain. Drives `AccountDomain` on
-  # IdentityLogonEvents / IdentityQueryEvents / IdentityDirectoryEvents,
-  # and the `Active Directory` provider entry in IdentityAccountInfo.
-  #   default: contoso.local
+  # On-prem AD DNS domain. Drives AccountDomain on Identity* tables.
   on_prem_ad_domain: northwind.local
 
-  # NetBIOS form of the on-prem AD domain. Match the DNS form above —
-  # mismatched NetBIOS / DNS values are a tell-tale sign of a fake row.
-  #   default: CONTOSO
+  # NetBIOS form of the on-prem AD domain — keep aligned with the DNS form.
   on_prem_netbios_domain: NORTHWIND
 
-  # SID prefix used to build per-user `AccountSid` values. Keep the
-  # `S-1-5-21-<authority1>-<authority2>-<authority3>` shape — per-user RIDs
-  # (e.g. `500` for the admin, `1104` for a regular user) are appended.
-  #   default: S-1-5-21-1004336348-1177238915-682003330
+  # SID prefix for AccountSid (per-user RID is appended).
   on_prem_sid_prefix: S-1-5-21-2547839481-3829164725-2581094736
 
-  # Domain controllers — every Defender for Identity event terminates at one.
-  # Required fields per entry: name, ip, device_id.
+  # Domain controllers. Required: name, ip, device_id.
   domain_controllers:
     - name: DC01.northwind.local
       ip: 10.10.0.10
@@ -88,16 +63,10 @@ overrides:
       ip: 10.10.0.11
       device_id: bbbb2222-3333-4444-5555-666666666666
 
-  # Managed endpoints reported on by Microsoft Defender for Endpoint.
-  # Drives every `Device*` table — DeviceEvents, DeviceProcessEvents,
-  # DeviceLogonEvents, DeviceNetworkEvents, DeviceImageLoadEvents,
-  # DeviceRegistryEvents, DeviceFileCertificateInfo, DeviceNetworkInfo.
-  # Required: device_id, device_name. Everything else is optional.
-  #
-  # `primary_user_upn` should match a `users[].upn` so the InitiatingProcess
-  # account on this device's events biases toward that user (~75% of the
-  # time). Omit it for shared / unattended endpoints (file servers, build
-  # boxes) so any user can show up.
+  # Managed endpoints (drives every Device* table). Required: device_id,
+  # device_name. `primary_user_upn` should match a users[].upn — that user
+  # then biases the InitiatingProcess account ~75% of the time. Omit for
+  # shared boxes (file servers, build runners).
   devices:
     - device_id: 7c2bd31c-2102-4ce7-93a0-2cf5e19b5a7d
       device_name: WIN-AVERY-01.northwind.com
@@ -126,17 +95,10 @@ overrides:
       mac_address: 00-15-5D-AA-33-15
       machine_group: File Servers
 
-  # Initiating processes — the catalogue of binaries Defender for Endpoint
-  # surfaces as the *initiator* of an event (`InitiatingProcessFileName` and
-  # the related `InitiatingProcess*` columns on every Device* table).
-  # Each entry is one process with its real version-info, signing posture,
-  # and a list of typical command lines. Hashes (MD5/SHA1/SHA256) are
-  # derived deterministically from `file_name` at runtime; do not include
-  # them here.
-  #
-  # `integrity_level`: Untrusted | Low | Medium | High | System
-  # `elevation`: Default | Full | Limited
-  # `signer_type`: OsVendor | ThirdParty | Unknown
+  # Initiating processes — populates InitiatingProcess* columns on Device*
+  # tables. Hashes are derived from file_name at runtime; don't set them.
+  # integrity_level: Untrusted|Low|Medium|High|System
+  # elevation: Default|Full|Limited   signer_type: OsVendor|ThirdParty|Unknown
   processes:
     - file_name: explorer.exe
       folder_path: C:\Windows
@@ -170,12 +132,9 @@ overrides:
       signer_type: OsVendor
       parent: explorer.exe
 
-  # Users / accounts that show up across every table. The first four fields
-  # (display_name, upn, object_id, type) are required; everything else is
-  # optional and falls back to None / sensible defaults if omitted.
-  #
-  # `type`: Regular | Admin | Application
-  # `sid_rid`: trailing RID appended to on_prem_sid_prefix to build AccountSid
+  # Users / accounts. Required: display_name, upn, object_id, type.
+  # type: Regular|Admin|Application
+  # sid_rid: appended to on_prem_sid_prefix to build AccountSid
   users:
     - display_name: Avery Chen
       upn: avery.chen@northwind.com
@@ -218,11 +177,9 @@ overrides:
       department: IT
       job_title: Service Account
 
-  # Source IPs paired with consistent geolocation. City / State / Country /
-  # ISP / Lat / Long must align per IP because Defender enriches from a
-  # single IP-to-geo table — mismatched values give the row away.
-  #
-  # `category`: Cloud provider | Corporate | ISP
+  # Source IPs with geolocation — city/state/country/isp/lat/long must
+  # align per IP (Defender enriches from a single table).
+  # category: Cloud provider|Corporate|ISP
   ips:
     - ip: 20.43.122.12
       city: Amsterdam
@@ -249,11 +206,8 @@ overrides:
       latitude: "51.507351"
       longitude: "-0.127758"
 
-  # User-agent strings paired with the OS / device / browser they imply.
-  # Surfaces in CloudAppEvents.UserAgent / .DeviceType / .OSPlatform and
-  # in the EntraIdSignInEvents Browser / OSPlatform columns.
-  #
-  # `device_type`: Workstation | Mobile
+  # User-agents. Surfaces in CloudAppEvents and EntraIdSignInEvents.
+  # device_type: Workstation|Mobile
   user_agents:
     - ua: >-
         Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
@@ -269,8 +223,25 @@ overrides:
       device_type: Mobile
       browser: Safari 17.4
 
-  # Resources users authenticate to in EntraIdSignInEvents.
-  # `id` is the resource's first-party app GUID.
+  # Service principals for EntraIdSpnSignInEvents.
+  # is_managed_identity: true → source IP biased to cloud-provider pool.
+  service_principals:
+    - name: northwind-app-prod
+      id: b7c1f4e2-0d8a-4d7e-9c2b-1a3f5e6c7d8a
+      app_id: f2c5d6e7-8a9b-4c1d-bf2e-3a4b5c6d7e8f
+      is_managed_identity: false
+    - name: northwind-functions-mi
+      id: c8d2e5f3-1e9b-4f8e-ad3c-2b4f6e7d8a9b
+      app_id: 0a1b2c3d-4e5f-4061-8273-849a5b6c7d8e
+      is_managed_identity: true
+    - name: github-actions-deploy
+      id: e0f4a715-3a1d-4b1a-cf5e-4d607b8c9d0e
+      app_id: 2c3d4e5f-6071-4283-a495-b6c7d8e9f012
+      is_managed_identity: false
+
+  # Resources users / SPNs authenticate to (id = first-party app GUID).
+  # If omitted, EntraIdSpnSignInEvents uses a workload-identity-flavoured
+  # default (Graph, ARM, Key Vault, Storage, SQL DB, Container Registry).
   resources:
     - name: Microsoft Graph
       id: 00000003-0000-0000-c000-000000000000
@@ -279,10 +250,7 @@ overrides:
     - name: Northwind LOB API
       id: 11112222-3333-4444-5555-666677778888
 
-  # Microsoft Entra ID directory groups. Surfaces as the `{group_id}` path
-  # segment in GraphApiAuditEvents.RequestUri (e.g.
-  # `/v1.0/groups/<id>/members`). Use this to keep generated Graph traffic
-  # pointed at the same set of groups your detections care about.
+  # Entra ID groups. Surfaces as {group_id} in GraphApiAuditEvents.RequestUri.
   groups:
     - name: All Employees
       id: aa11bb22-cc33-4dd4-9eef-1011223344aa
@@ -291,8 +259,7 @@ overrides:
     - name: Tier-0 Admins
       id: ee55ff66-0077-4118-9223-5455667788ee
 
-  # Client applications users sign in *through*. Surfaces in
-  # EntraIdSignInEvents.Application / .ApplicationId.
+  # Client apps users sign in through (EntraIdSignInEvents.Application).
   client_apps:
     - name: Microsoft Office
       app_id: d3590ed6-52b3-4102-aeff-aad2292ab01c
@@ -301,11 +268,8 @@ overrides:
     - name: Northwind Approver
       app_id: a1b2c3d4-e5f6-7890-1234-56789abcdef0
 
-  # Conditional Access policies that may apply during sign-in. The payload
-  # is serialised straight into the JSON `ConditionalAccessPolicies` column
-  # on EntraIdSignInEvents — field names mirror Microsoft Graph's
-  # camelCase shape (`displayName`, `enforcedGrantControls`,
-  # `enforcedSessionControls`).
+  # CA policies serialised into EntraIdSignInEvents.ConditionalAccessPolicies.
+  # Field names follow Graph's camelCase shape.
   conditional_access_policies:
     - id: 8d2d8c45-2f9f-4c5e-8b1a-1c12fbb1d9e6
       displayName: "Require MFA for all users"
@@ -323,16 +287,9 @@ overrides:
         - CompliantDevice
       enforcedSessionControls: []
 
-  # Entra ID `ErrorCode` distribution for *user* sign-ins (interactive and
-  # non-interactive). Each entry is a (code, weight, description) triple.
-  # `code: 0` is success. Weights are relative — `[(0, 80), (50126, 5)]`
-  # makes success outweigh InvalidUserNameOrPassword 16:1. `description`
-  # is optional; when set it surfaces verbatim in
-  # EntraIdSignInEvents.AuthenticationProcessingDetails on failures, so the
-  # row reads like a real Entra processor message rather than a bare number.
-  #
-  # Use this to simulate scenarios — e.g. a password-spray spike by jacking
-  # 50126's weight up, or a Conditional Access rollout by inflating 53003.
+  # User sign-in ErrorCode distribution. code 0 = success; weights relative.
+  # description (optional) surfaces in AuthenticationProcessingDetails.
+  # Reshape to simulate scenarios (e.g. password-spray = bump 50126).
   # See https://learn.microsoft.com/azure/active-directory/develop/reference-error-codes
   entra_sign_in_error_codes:
     - code: 0
@@ -353,8 +310,7 @@ overrides:
       weight: 1
       description: "UserDisabled: The user account is disabled."
 
-  # Same shape, for *service principal* sign-ins. SPNs fail rarely and the
-  # failure modes are token / consent issues rather than credential typos.
+  # Same shape, for service principal sign-ins (token/consent failures).
   entra_spn_sign_in_error_codes:
     - code: 0
       weight: 92

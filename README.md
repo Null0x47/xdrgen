@@ -130,8 +130,9 @@ The profile is validated by Pydantic models defined in [`world.py`](./world.py) 
 | `users` | **`display_name`**, **`upn`**, **`object_id`**, `type`, `device_name`, `device_id`, `last_password_change_days_ago`, `sam_account_name`, `sid_rid`, `given_name`, `surname`, `department`, `job_title`, `employee_id`, `city`, `country` | Almost every table |
 | `ips` | **`ip`**, **`city`**, **`state`**, **`country`**, **`isp`**, **`category`**, **`latitude`**, **`longitude`** | Source IPs across cloud and email tables |
 | `user_agents` | **`ua`**, **`platform`**, **`device_type`**, **`browser`** | `CloudAppEvents`, `EntraIdSignInEvents`, `IdentityLogonEvents` |
-| `resources` | **`name`**, **`id`** | `EntraIdSignInEvents.ResourceDisplayName` / `.ResourceId` |
+| `resources` | **`name`**, **`id`** | `EntraIdSignInEvents.ResourceDisplayName` / `.ResourceId`, plus `EntraIdSpnSignInEvents` when overridden (otherwise SPN events fall back to a workload-identity-flavoured default) |
 | `client_apps` | **`name`**, **`app_id`** | `EntraIdSignInEvents.Application` / `.ApplicationId` |
+| `service_principals` | **`name`**, **`id`**, **`app_id`**, `is_managed_identity` | `EntraIdSpnSignInEvents.ServicePrincipalName` / `.ServicePrincipalId` / `.Application` / `.ApplicationId` |
 | `groups` | **`name`**, **`id`** | `GraphApiAuditEvents.RequestUri` (`/groups/{id}/…`) |
 | `conditional_access_policies` | **`id`**, **`displayName`**, `enforcedGrantControls`, `enforcedSessionControls` | `EntraIdSignInEvents.ConditionalAccessPolicies` |
 | `entra_sign_in_error_codes` | **`code`**, **`weight`**, `description` | `EntraIdSignInEvents.ErrorCode` distribution + `AuthenticationProcessingDetails` |

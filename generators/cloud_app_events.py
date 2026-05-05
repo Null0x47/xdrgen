@@ -8,9 +8,7 @@ from generators.base import register
 from generators.common import now_utc
 from world import User, World
 
-# Curated cloud-app catalogue. ApplicationId values match Defender for Cloud
-# Apps' app catalogue; per-app action pools come from the actual ActionType
-# vocabulary each connector emits.
+# ApplicationId / actions sourced from the Defender for Cloud Apps catalogue.
 _APPS = [
     {
         "name": "Microsoft 365",
@@ -125,7 +123,6 @@ _MAIL_SUBJECTS = [
 def _activity_objects(
     action: str, user: User, world: World
 ) -> tuple[str, str, str, list[dict]]:
-    """Pick (object_type, object_name, object_id, activity_objects) for an action."""
     a = action.lower()
     if any(
         k in a

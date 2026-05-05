@@ -9,10 +9,7 @@ from generators.device_common import envelope, hashes_for, pick_device
 from models import DeviceFileCertificateInfo
 from world import World
 
-# Curated catalogue of code-signing certificates seen in the wild on signed
-# Windows binaries. `is_root_microsoft` mirrors the IsRootSignerMicrosoft
-# column — flips on iff the chain terminates at a Microsoft root, which is
-# what Defender uses to surface "trusted system binary" rows.
+# Real code-signing certs. is_root_microsoft drives IsRootSignerMicrosoft.
 _CERTIFICATES = [
     {
         "subject": "Microsoft Windows",
@@ -90,8 +87,7 @@ def generate(world: World) -> DeviceFileCertificateInfo:
     file_name = random.choice(_SIGNED_FILES)
     _, sha1, _ = hashes_for(file_name)
 
-    # Roughly 95% of files in the inventory are signed; a thin tail of
-    # unsigned binaries (vendor tools that stripped their signature, etc.).
+    # ~95% signed.
     is_signed = random.random() < 0.95
     is_trusted = is_signed and random.random() < 0.97
 

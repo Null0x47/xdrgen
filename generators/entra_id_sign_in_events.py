@@ -14,15 +14,14 @@ from world import ConditionalAccessPolicy, World
 def _conditional_access_payload(
     policies: tuple[ConditionalAccessPolicy, ...], success: bool
 ) -> tuple[str, int]:
-    """Return (json-encoded policies string, ConditionalAccessStatus)."""
+    """Return (JSON policies, ConditionalAccessStatus). Status: 0=applied, 1=failed, 2=notApplied."""
     if not policies:
         return "[]", 0 if success else 2
     sample = random.sample(policies, k=random.randint(1, len(policies)))
     if success:
-        status = 0  # success / applied
+        status = 0
         result = "success"
     else:
-        # 1 = failure to apply, 2 = not applied (e.g. block / interrupted)
         status = random.choice([1, 2])
         result = "failure" if status == 1 else "notApplied"
     payload = [
@@ -55,7 +54,7 @@ def generate(world: World) -> EntraIdSignInEvents:
     error_code = error_entry.code
     success = error_code == 0
 
-    # Logon type — service / app accounts are more often non-interactive.
+    # Service/app accounts skew non-interactive.
     if user.type == "Application":
         logon_type = "nonInteractiveUser"
     else:
@@ -65,8 +64,6 @@ def generate(world: World) -> EntraIdSignInEvents:
             k=1,
         )[0]
 
-    # Browser sign-ins via web come from Browser client app; Outlook UA
-    # implies a desktop client; mobile UA implies the mobile app.
     if "Mobile" in ua.device_type:
         client_app_used = "Mobile Apps and Desktop clients"
     elif "Outlook" in ua.browser:
@@ -74,8 +71,7 @@ def generate(world: World) -> EntraIdSignInEvents:
     else:
         client_app_used = "Browser"
 
-    # Device association: only some users have a registered device, and we
-    # only attach it ~70% of the time even when they do.
+    # ~70% chance of attaching a registered device when the user has one.
     has_device = user.device_id is not None and random.random() < 0.7
     device_name = user.device_name if has_device else None
     device_id = user.device_id if has_device else None
@@ -87,7 +83,6 @@ def generate(world: World) -> EntraIdSignInEvents:
     is_guest = is_external == 1
     is_confidential_client = user.type == "Application"
 
-    # Risk telemetry — usually clean, occasionally elevated.
     if success and random.random() < 0.95:
         risk_level = 0
         risk_state = 0

@@ -1,18 +1,5 @@
-"""Kustainer sink.
-
-Pushes generated events into a local
-[Kustainer](https://learn.microsoft.com/en-us/azure/data-explorer/kusto-emulator-overview)
-instance — Microsoft's official Kusto/ADX emulator. Each event lands in the
-table named after its Pydantic model (e.g. `CloudAppEvents` → `CloudAppEvents`).
-
-The emulator does not implement streaming ingestion or the Data Management
-service, so neither `KustoStreamingIngestClient` nor `QueuedIngestClient` work
-against it. We use the universally-supported `.ingest inline` control command
-on the engine endpoint instead, which only needs `KustoClient.execute_mgmt`.
-
-Tables must already exist with the right schema — run
-`scripts/create_kustainer_tables.py` once before the first ingest.
-"""
+"""Kustainer sink — uses `.ingest inline` since the emulator lacks streaming /
+Data Management. Run `scripts/create_kustainer_tables.py` once first."""
 
 from __future__ import annotations
 
@@ -40,12 +27,7 @@ _PY_TO_KUSTO: dict[Any, str] = {
 
 
 def kusto_type_for_annotation(annotation: Any) -> str:
-    """Map a Pydantic field annotation to a Kusto column type.
-
-    Handles `Optional[T]` / `T | None` by unwrapping the union. Anything that
-    isn't a known scalar (dicts, lists, `Any`, custom models, …) maps to
-    `dynamic`, which Kusto stores as JSON.
-    """
+    """Pydantic annotation → Kusto type. Non-scalar / unknown → `dynamic`."""
     origin = typing.get_origin(annotation)
     if origin in (typing.Union, types.UnionType):
         non_none = [a for a in typing.get_args(annotation) if a is not type(None)]
@@ -58,12 +40,7 @@ def kusto_type_for_annotation(annotation: Any) -> str:
 
 
 def columns_for_model(cls: type[BaseModel]) -> list[tuple[str, str]]:
-    """Return `[(column_name, kusto_type), ...]` for a Pydantic model class.
-
-    Column names use field aliases when present (codegen aliases keyword-clash
-    field names back to their original Defender column names) so the emitted
-    schema matches what `.model_dump(by_alias=True)` produces.
-    """
+    """`[(column_name, kusto_type), ...]`; uses field aliases when set."""
     out: list[tuple[str, str]] = []
     for name, info in cls.model_fields.items():
         column = _column_name(name, info)
@@ -121,9 +98,7 @@ class KustainerSink:
         table_prefix: str = "",
         client_factory=_default_client_factory,
     ) -> None:
-        """`client_factory(cluster_uri)` is injectable so tests can stub the
-        Kusto client without standing up an emulator. In normal use it builds
-        a real `KustoClient` against the unauthenticated emulator endpoint."""
+        # client_factory is injectable for tests.
         self._database = database
         self._table_prefix = table_prefix
         self._client = client_factory(cluster_uri)

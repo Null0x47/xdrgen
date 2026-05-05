@@ -7,10 +7,7 @@ from generators.base import register
 from generators.common import now_utc
 from world import World
 
-# (QueryType, Protocol, Port) — Defender for Identity surfaces queries that
-# came in over LDAP, SAMR (\\PIPE\\samr over SMB on 445), or Kerberos
-# (s4u2self / forwardable lookups). DNS QueryTypes also exist for some
-# enumeration patterns.
+# (QueryType, Protocol, Port, weight) for LDAP / SAMR / DNS reconnaissance.
 _QUERY_KINDS = [
     ("QueryUser", "Ldap", 389, 35),
     ("QueryGroup", "Ldap", 389, 25),
@@ -22,9 +19,7 @@ _QUERY_KINDS = [
 ]
 _QUERY_VALUES, _QUERY_PROTOCOLS, _QUERY_PORTS, _QUERY_WEIGHTS = zip(*_QUERY_KINDS)
 
-# A small bag of group / OU / computer names that show up as QueryTarget
-# values in real recon traffic (BloodHound-style enumeration tends to walk
-# Domain Admins, Enterprise Admins, and tier-0 OUs).
+# BloodHound-style targets for QueryTarget values.
 _GROUP_TARGETS = [
     "Domain Admins",
     "Enterprise Admins",
@@ -55,14 +50,12 @@ def _query_target_for_kind(query_type: str, world: World) -> str:
         return world.on_prem_ad_domain
     if query_type == "Resolve":
         return random.choice(_COMPUTER_TARGETS) + f".{world.on_prem_ad_domain}"
-    # Default: user / unspecified — pick a sAMAccountName from the user pool.
     candidates = [u for u in world.users if u.sam_account_name]
     pick = random.choice(candidates) if candidates else random.choice(world.users)
     return pick.sam_account_name or pick.upn
 
 
 def _ldap_query_string(query_type: str, target: str) -> str:
-    """Build a plausible LDAP-style filter for the given query."""
     if query_type == "QueryUser":
         return f"(&(objectClass=user)(sAMAccountName={target}))"
     if query_type == "QueryGroup":
@@ -95,9 +88,6 @@ def generate(world: World) -> IdentityQueryEvents:
     target = _query_target_for_kind(query_type, world)
     query = _ldap_query_string(query_type, target)
 
-    # Map TargetAccount* to a real user when the query is user-scoped, and to
-    # the matching DC when it's a domain / computer query — keeps the row
-    # consistent with how MDI actually fills these.
     if query_type in ("QueryUser", "EnumerateUsers"):
         target_user = next(
             (u for u in world.users if u.sam_account_name == target),

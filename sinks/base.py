@@ -1,13 +1,4 @@
-"""Sink protocol.
-
-A `Sink` consumes batches of generated events and persists them somewhere
-(JSON file, Kafka topic, …). New sinks plug in by implementing the protocol
-and exposing a `build(...)` factory in their module — `main.py` picks one
-based on the `--sink` flag.
-
-Each batch is a list of `(table_name, event_model)` tuples. Sinks must accept
-zero or more `write()` calls and exactly one `close()`.
-"""
+"""Sink protocol — write(batch) zero+ times, close() once."""
 
 from __future__ import annotations
 

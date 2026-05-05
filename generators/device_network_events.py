@@ -12,9 +12,7 @@ from generators.device_common import (
 from models import DeviceNetworkEvents
 from world import World
 
-# DeviceNetworkEvents ActionType vocabulary. Successful outbound TCP/UDP
-# dominates a healthy endpoint; the rest is failed/blocked traffic and
-# inbound listening sockets.
+# Weighted ActionType — outbound success dominates; rest is failures + inbound.
 _ACTION_TYPES = [
     ("ConnectionSuccess", 60),
     ("ConnectionFailed", 8),
@@ -27,7 +25,7 @@ _ACTION_TYPES = [
 ]
 _ACTION_VALUES, _ACTION_WEIGHTS = zip(*_ACTION_TYPES)
 
-# Realistic remote ports + the URL/host for telemetry-shape consistency.
+# (port, host) pairs — host is None when the port is unrelated to a URL.
 _REMOTE_DESTS = [
     (443, "graph.microsoft.com"),
     (443, "outlook.office365.com"),

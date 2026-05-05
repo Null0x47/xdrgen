@@ -12,8 +12,7 @@ from generators.device_common import (
 from models import DeviceRegistryEvents
 from world import World
 
-# Defender for Endpoint registry-event vocabulary. ValueSet dominates by far
-# (every config flip produces one), with key-create / key-rename rarer.
+# Weighted ActionType — RegistryValueSet dominates.
 _ACTION_TYPES = [
     ("RegistryValueSet", 60),
     ("RegistryKeyCreated", 12),
@@ -25,9 +24,7 @@ _ACTION_TYPES = [
 ]
 _ACTION_VALUES, _ACTION_WEIGHTS = zip(*_ACTION_TYPES)
 
-# Realistic registry keys / value names / data tuples — pairs that actually
-# co-occur on a Windows endpoint. Defender hunters look for hits on Run,
-# IFEO, and policy keys, so the catalogue leans into those areas.
+# (key, value_name, value_data, value_type) — Run / IFEO / policy keys hunters watch.
 _REGISTRY_TARGETS = [
     (
         r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
@@ -88,7 +85,6 @@ def generate(world: World) -> DeviceRegistryEvents:
     action_type = random.choices(_ACTION_VALUES, weights=_ACTION_WEIGHTS, k=1)[0]
     key, value_name, value_data, value_type = random.choice(_REGISTRY_TARGETS)
 
-    # Modify / rename actions carry both the new and previous values.
     has_previous = "Renamed" in action_type or "Set" in action_type
     previous_key = key if action_type == "RegistryKeyRenamed" else None
     previous_value_name = (

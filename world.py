@@ -1,16 +1,4 @@
-"""Single-source-of-truth for the runtime world telemetry generators sample from.
-
-`World` is a frozen Pydantic model holding every fixture (tenant identity
-scalars, users, IPs, user-agents, domain controllers, client apps, resources,
-conditional access policies). Generators take a `World` as a parameter — they
-never read or mutate module-level state. A `World` instance is built exactly
-once per `xdrgen generate` run, from `Profile.build_world()`, and threaded
-through every event.
-
-`Profile` and `Overrides` are the YAML-shape models. `Overrides` mirrors `World`
-field-for-field but every field is `Optional`, modelling the patch that the
-user's YAML supplies on top of the defaults.
-"""
+"""Frozen World fixture + Profile/Overrides YAML models for generators."""
 
 from __future__ import annotations
 
@@ -20,8 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class User(BaseModel):
-    """A tenant user / service account / guest. All fields except the four
-    identity essentials default sensibly so YAML overrides can stay terse."""
+    """Tenant user / service account / guest."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -52,13 +39,7 @@ class DomainController(BaseModel):
 
 
 class Process(BaseModel):
-    """An entry in the curated `InitiatingProcess*` catalogue used by the
-    Device* generators. Each row is one process Defender for Endpoint
-    surfaces as the initiator of an event — `cmd.exe`, `powershell.exe`,
-    `MsMpEng.exe`, … — paired with the version-info, signing posture,
-    typical command lines, and parent process the real binary carries.
-    Hashes are derived from `file_name` at runtime; supplying them in
-    YAML would be redundant."""
+    """One InitiatingProcess catalogue entry — hashes are derived at runtime."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -79,13 +60,7 @@ class Process(BaseModel):
 
 
 class Device(BaseModel):
-    """A managed endpoint reported on by Microsoft Defender for Endpoint.
-
-    Drives every `Device*` table (`DeviceEvents`, `DeviceProcessEvents`,
-    `DeviceLogonEvents`, …). The fixture pool is intentionally separate from
-    `User.device_name` / `User.device_id` (which only stamp identity-side
-    rows) — endpoint events need richer context: OS platform, MAC, primary
-    local/public IP, machine group, and a back-link to the primary user."""
+    """MDE-managed endpoint — drives every Device* table."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -101,9 +76,7 @@ class Device(BaseModel):
 
 
 class IPEntry(BaseModel):
-    """A source IP paired with its geolocation. Real Defender events are
-    enriched from the same IP-to-geo table, so City / State / Country / ISP /
-    Lat / Long must stay aligned per IP."""
+    """Source IP + geolocation; fields must align per IP."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -140,9 +113,20 @@ class ClientApp(BaseModel):
     app_id: str
 
 
+class ServicePrincipal(BaseModel):
+    """Workload identity for EntraIdSpnSignInEvents.
+    is_managed_identity=True biases source IPs to the cloud-provider pool."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str
+    id: str
+    app_id: str
+    is_managed_identity: bool = False
+
+
 class Group(BaseModel):
-    """A directory group (Microsoft Entra ID security/M365 group). Surfaces
-    as the `{group_id}` path segment in `GraphApiAuditEvents.RequestUri`."""
+    """Entra ID directory group — surfaces in GraphApiAuditEvents.RequestUri."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -151,9 +135,7 @@ class Group(BaseModel):
 
 
 class ConditionalAccessPolicy(BaseModel):
-    """Field names mirror Microsoft Graph's camelCase shape because the
-    payload is serialised straight into the `ConditionalAccessPolicies` JSON
-    column on EntraIdSignInEvents."""
+    """camelCase to match Graph — serialised into EntraIdSignInEvents.ConditionalAccessPolicies."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -164,11 +146,8 @@ class ConditionalAccessPolicy(BaseModel):
 
 
 class WeightedErrorCode(BaseModel):
-    """An Entra ID `ErrorCode` value with a sampling weight and an optional
-    short description. The weight is relative — `[(0, 80), (50126, 5)]` means
-    success outweighs InvalidUserNameOrPassword 16:1. The description, when
-    provided, surfaces in `AuthenticationProcessingDetails` so failed sign-ins
-    carry a realistic processor message instead of a bare error number."""
+    """Entra ID ErrorCode with sampling weight; description (optional) feeds
+    AuthenticationProcessingDetails on failures."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -682,6 +661,40 @@ _DEFAULT_GROUPS: tuple[Group, ...] = (
 )
 
 
+_DEFAULT_SERVICE_PRINCIPALS: tuple[ServicePrincipal, ...] = (
+    ServicePrincipal(
+        name="contoso-app-prod",
+        id="b7c1f4e2-0d8a-4d7e-9c2b-1a3f5e6c7d8a",
+        app_id="f2c5d6e7-8a9b-4c1d-bf2e-3a4b5c6d7e8f",
+        is_managed_identity=False,
+    ),
+    ServicePrincipal(
+        name="contoso-functions-mi",
+        id="c8d2e5f3-1e9b-4f8e-ad3c-2b4f6e7d8a9b",
+        app_id="0a1b2c3d-4e5f-4061-8273-849a5b6c7d8e",
+        is_managed_identity=True,
+    ),
+    ServicePrincipal(
+        name="contoso-aks-system-mi",
+        id="d9e3f604-2f0c-4a09-be4d-3c5f7a8b9c0d",
+        app_id="1b2c3d4e-5f60-4172-9384-95a6b7c8d9ef",
+        is_managed_identity=True,
+    ),
+    ServicePrincipal(
+        name="github-actions-deploy",
+        id="e0f4a715-3a1d-4b1a-cf5e-4d607b8c9d0e",
+        app_id="2c3d4e5f-6071-4283-a495-b6c7d8e9f012",
+        is_managed_identity=False,
+    ),
+    ServicePrincipal(
+        name="terraform-cloud-runner",
+        id="f105b826-4b2e-4c2b-d06f-5e718c9d0e1f",
+        app_id="3d4e5f60-7182-4394-b5a6-c7d8e9f01223",
+        is_managed_identity=False,
+    ),
+)
+
+
 _DEFAULT_RESOURCES: tuple[Resource, ...] = (
     Resource(name="Microsoft Graph", id="00000003-0000-0000-c000-000000000000"),
     Resource(
@@ -703,12 +716,8 @@ _DEFAULT_RESOURCES: tuple[Resource, ...] = (
 )
 
 
-# Expanded vocabulary of real Entra ID interactive / non-interactive sign-in
-# error codes. Codes and descriptions track the published catalogue at
+# Real Entra ErrorCodes; healthy tenant ~80% success.
 # https://learn.microsoft.com/azure/active-directory/develop/reference-error-codes
-# Weights are tuned to mirror a healthy tenant — ~80% success with a long tail
-# dominated by credential and MFA friction. Override `entra_sign_in_error_codes`
-# in YAML to reshape the distribution (e.g. simulate a password-spray spike).
 _DEFAULT_ENTRA_SIGN_IN_ERROR_CODES: tuple[WeightedErrorCode, ...] = (
     WeightedErrorCode(code=0, weight=80),
     WeightedErrorCode(
@@ -777,10 +786,7 @@ _DEFAULT_ENTRA_SIGN_IN_ERROR_CODES: tuple[WeightedErrorCode, ...] = (
 )
 
 
-# Service-principal sign-ins fail more rarely than user sign-ins and almost
-# always over secret / consent issues rather than credential typos. The
-# weights bias toward success and the long tail covers the failure modes a
-# detection engineer would actually want to see in their telemetry.
+# SPN sign-ins skew to success; failures are secret/consent issues.
 _DEFAULT_ENTRA_SPN_SIGN_IN_ERROR_CODES: tuple[WeightedErrorCode, ...] = (
     WeightedErrorCode(code=0, weight=92),
     WeightedErrorCode(
@@ -846,13 +852,7 @@ _DEFAULT_CA_POLICIES: tuple[ConditionalAccessPolicy, ...] = (
 
 
 class World(BaseModel):
-    """Immutable per-run container for all tenant + fixture data.
-
-    Built once via `Profile.build_world()` and threaded into every generator
-    call. Generators read; never mutate. Frozen + tuple-typed collections make
-    it deeply immutable AND hashable, which lets `EmailCorpus` cache itself
-    per-World via `functools.lru_cache`.
-    """
+    """Immutable per-run fixture container; frozen + hashable for lru_cache."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -869,6 +869,7 @@ class World(BaseModel):
     ips: tuple[IPEntry, ...] = _DEFAULT_IPS
     user_agents: tuple[UserAgentEntry, ...] = _DEFAULT_USER_AGENTS
     client_apps: tuple[ClientApp, ...] = _DEFAULT_CLIENT_APPS
+    service_principals: tuple[ServicePrincipal, ...] = _DEFAULT_SERVICE_PRINCIPALS
     resources: tuple[Resource, ...] = _DEFAULT_RESOURCES
     groups: tuple[Group, ...] = _DEFAULT_GROUPS
     conditional_access_policies: tuple[ConditionalAccessPolicy, ...] = (
@@ -883,11 +884,7 @@ class World(BaseModel):
 
 
 class Overrides(BaseModel):
-    """YAML-shape patch applied on top of World defaults.
-
-    Every field mirrors `World` but is `Optional`. Unset fields keep their
-    defaults; set fields fully replace them (no merge for collections).
-    """
+    """YAML patch on World defaults; collection overrides replace, never merge."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -905,6 +902,7 @@ class Overrides(BaseModel):
     user_agents: Optional[list[UserAgentEntry]] = None
     resources: Optional[list[Resource]] = None
     client_apps: Optional[list[ClientApp]] = None
+    service_principals: Optional[list[ServicePrincipal]] = None
     groups: Optional[list[Group]] = None
     conditional_access_policies: Optional[list[ConditionalAccessPolicy]] = None
     entra_sign_in_error_codes: Optional[list[WeightedErrorCode]] = None
@@ -912,11 +910,7 @@ class Overrides(BaseModel):
 
 
 class Profile(BaseModel):
-    """Top-level YAML profile: an optional list of tables to generate, plus an
-    optional `overrides:` block that patches World defaults. When `tables` is
-    omitted (or empty), the CLI falls back to every registered generator —
-    handy for users who only want to ship overrides without restating the
-    full table list."""
+    """Top-level YAML profile — `tables` and `overrides` are both optional."""
 
     model_config = ConfigDict(extra="forbid")
 

@@ -42,8 +42,7 @@ def test_parse_xdr_table_names_unions_multiple_csvs():
 
 
 def test_parse_xdr_table_names_substring_match():
-    # category strings in the source data are sometimes phrases like
-    # "Microsoft 365 Defender (XDR)" — substring match, not exact equality.
+    # Source uses phrases like "Microsoft 365 Defender (XDR)" — substring match.
     csv_text = (
         "table_name,category\n"
         "Phrase,Microsoft 365 Defender (XDR)\n"

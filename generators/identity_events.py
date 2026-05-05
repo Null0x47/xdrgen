@@ -8,9 +8,7 @@ from generators.base import register
 from generators.common import now_utc
 from world import User, World
 
-# IdentityEvents is the unified Sentinel SecurityIQ table — fed by many
-# source applications, not just AD. ActionType here is the *raw* value from
-# the source, not a normalised enum. (action, application, target_kind).
+# Raw (action, application, target_kind) — ActionType is the source's own value.
 _RAW_ACTIONS = [
     ("UserLoggedIn", "AzureActiveDirectory", "user"),
     ("UserLoginFailed", "AzureActiveDirectory", "user"),
@@ -89,8 +87,6 @@ def generate(world: World) -> IdentityEvents:
     action_type, application, target_kind = random.choice(_RAW_ACTIONS)
     target_objects = _target_objects(target_kind, user)
 
-    # Failures are signalled both by the ActionType ("…Failed") and by an
-    # explicit ActionResult so consumers can pivot on either.
     failed = "Failed" in action_type or "fail" in action_type.lower()
     action_result = "Failure" if failed else "Success"
     failure_reason = "InvalidCredentials" if failed else None

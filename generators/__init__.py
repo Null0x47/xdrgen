@@ -1,11 +1,4 @@
-"""Telemetry generator registry.
-
-Every submodule of `generators/` whose name is not in `_SKIP` is auto-imported
-on package load. Each generator decorates its `generate(world)` function with
-`@register("TableName")` from `generators.base`, populating `GENERATORS` as a
-side effect of the import. Adding a new generator is a one-file change —
-drop the file, decorate, done.
-"""
+"""Auto-imports each generator submodule so `@register` populates GENERATORS."""
 
 from __future__ import annotations
 
@@ -14,7 +7,7 @@ import pkgutil
 
 from generators.base import GENERATORS as GENERATORS
 
-# Submodules that contain shared infrastructure rather than a generator.
+# Shared infrastructure modules — not generators.
 _SKIP = {"base", "common", "device_common", "email_corpus"}
 
 for _info in pkgutil.iter_modules(__path__):

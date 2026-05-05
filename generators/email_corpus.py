@@ -1,22 +1,8 @@
-"""Shared email corpus for the Email* / UrlClickEvents generators.
+"""Shared email pool for Email* / UrlClickEvents generators.
 
-The five email-side tables in Defender XDR (`EmailEvents`,
-`EmailAttachmentInfo`, `EmailPostDeliveryEvents`, `EmailUrlInfo`,
-`UrlClickEvents`) all carry a `NetworkMessageId` field that is the join key
-across them — given one row, an analyst pivots to every related row by that
-GUID.
-
-To make our generated stream actually pivotable, every event has to draw
-from the *same* finite set of emails rather than minting a fresh GUID per
-row. This module defines that pool: a curated list of pre-built emails,
-each carrying everything any of the five generators might need to emit a
-faithful row about it (sender / recipient identities, attachments,
-embedded URLs, threat verdicts, delivery action, etc.).
-
-`EmailCorpus` is built from a `World` (so persona-based recipient lookups
-resolve against the *current* user list) and minted exactly once per World
-via `corpus_for(world)`. Each email generator does
-`corpus_for(world).pick()` to draw a resolved entry.
+Every email-side table joins on `NetworkMessageId`, so all generators draw
+from one finite pool of pre-built emails. `corpus_for(world)` returns the
+per-World singleton with personas resolved against `world.users`.
 """
 
 from __future__ import annotations
@@ -31,35 +17,21 @@ from world import User, World
 
 
 def _sha256_hex(name: str) -> str:
-    """Stable per-filename SHA-256 — keeps a given attachment's hash equal
-    across runs so two events about the same attachment agree on it."""
+    # Stable per-filename so the same attachment hashes the same across rows.
     return hashlib.sha256(f"contoso::{name}".encode()).hexdigest()
 
 
 def _new_network_message_id() -> str:
-    """Defender 365 issues a v4-shaped GUID per email."""
     return str(uuid.uuid4())
 
 
 def _new_internet_message_id(domain: str) -> str:
-    """RFC 5322 message-id: `<token@domain>`. The token side mirrors the way
-    real MTAs build them — a uuid-derived hex with no dashes."""
+    # RFC 5322 message-id: <token@domain>.
     return f"<{uuid.uuid4().hex}@{domain}>"
 
 
-# Each entry is a fully self-contained email — every Email* / UrlClickEvents
-# row about it is derived entirely from these fields. The mix covers:
-#   * routine vendor mail (Acme, DocuSign)
-#   * platform notifications (GitHub, Microsoft Teams)
-#   * a phishing attempt that should land in Quarantine
-#   * a high-bulk newsletter that gets junked
-#   * intra-org collaboration
-#   * outbound mail from an admin to an external partner
-#
-# Each entry below is a *template* — it lacks `network_message_id`,
-# `internet_message_id`, attachment SHA-256s, and a resolved recipient.
-# `EmailCorpus.__init__` derives those from the template + World, and
-# stores the resolved entries in `EmailCorpus.entries`.
+# Templates — runtime fields (NetworkMessageId, InternetMessageId, SHA-256,
+# recipient) are filled in by EmailCorpus.__init__.
 _EMAIL_TEMPLATES: list[dict[str, Any]] = [
     {
         "subject": "Invoice 8421 - Q2 services",
@@ -408,10 +380,7 @@ _EMAIL_TEMPLATES: list[dict[str, Any]] = [
 
 
 def _resolve_recipient(persona: str, users: tuple[User, ...]) -> User:
-    """Match a template's persona against the world's user list.
-
-    Falls back to a deterministic hash index if the persona has been removed,
-    so the row still has a valid recipient rather than raising."""
+    # Hash-index fallback when the persona has been removed from the world.
     match = next((u for u in users if u.sam_account_name == persona), None)
     if match is not None:
         return match
@@ -419,11 +388,7 @@ def _resolve_recipient(persona: str, users: tuple[User, ...]) -> User:
 
 
 class EmailCorpus:
-    """Per-World email pool. Resolves persona-based recipients against
-    `world.users` once at construction; mints fresh `NetworkMessageId` /
-    `InternetMessageId` GUIDs and stable per-filename SHA-256s.
-
-    Held as a singleton-per-World by `corpus_for(world)`."""
+    """Per-World email pool — resolves recipients and mints stable IDs once."""
 
     def __init__(self, world: World) -> None:
         resolved: list[dict[str, Any]] = []
@@ -447,23 +412,15 @@ class EmailCorpus:
         return random.choice(self.entries)
 
     def pick_with_attachments(self) -> dict[str, Any]:
-        """Pick an email that has at least one attachment."""
         candidates = [e for e in self.entries if e["attachments"]]
         return random.choice(candidates)
 
     def pick_with_urls(self) -> dict[str, Any]:
-        """Every template has URLs today, but the helper stays symmetric
-        with `pick_with_attachments` so callers don't accidentally rely on
-        that invariant."""
         candidates = [e for e in self.entries if e["urls"]]
         return random.choice(candidates)
 
 
 @functools.lru_cache(maxsize=4)
 def corpus_for(world: World) -> EmailCorpus:
-    """Return the `EmailCorpus` for this World, minting it on first call.
-
-    Cached on `World` itself (which is hashable thanks to `frozen=True` +
-    tuple collection fields). One corpus per World — production builds a
-    single World per run, so production builds a single corpus."""
+    # Cached on World (frozen + hashable) — one corpus per generate run.
     return EmailCorpus(world)

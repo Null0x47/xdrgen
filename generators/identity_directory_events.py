@@ -7,9 +7,7 @@ from generators.base import register
 from generators.common import now_utc
 from world import World
 
-# Defender for Identity surfaces directory-change ActionTypes as readable
-# strings (no numeric event IDs). Weights bias toward routine churn (group
-# membership, password resets) and keep the rarer admin operations thin.
+# Weighted ActionType — group/password churn dominates.
 _ACTION_TYPES = [
     ("Group Membership changed", 32),
     ("Account Password changed", 22),
