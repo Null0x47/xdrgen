@@ -2,40 +2,19 @@
 
 `xdrgen` is a CLI tool that generates production-like Defender XDR telemetry based on a provided YAML profile.
 
-> **⚠️ Experimental / heavily vibe-coded.** This project is a work in progress and was largely built by feel rather than against an authoritative spec. The generated telemetry **will** contain errors — wrong enum values, fields that wouldn't co-occur in real Defender data, distributions that don't match production, etc. Don't rely on it for anything that matters until each table has been evaluated against real-world samples. Correctness will be tightened in future changes.
+> **⚠️ Experimental / heavily vibe-coded.** The generated telemetry **will** contain errors — wrong enum values, fields that wouldn't co-occur in real Defender data, distributions that don't match production, etc. Don't rely on it for anything that matters until each table has been evaluated against real-world samples.
 
-It does two things:
+Two commands:
 
-1. **`generate`** — produce coherent, production-like telemetry events as JSON, driven by a YAML profile that lists which tables to emit.
-2. **`update-models`** — fetch the canonical list of Defender XDR / MDE tables and their Solution Analyzer column schemas from the [`Azure/Azure-Sentinel`](https://github.com/Azure/Azure-Sentinel) repo, and emit one strongly-typed Pydantic model per table into `./models/`.
+1. **`generate`** — produce coherent telemetry events as JSON, driven by an optional YAML profile.
+2. **`update-models`** — fetch the canonical Defender XDR / MDE table schemas from [`Azure/Azure-Sentinel`](https://github.com/Azure/Azure-Sentinel) and emit one Pydantic model per table into `./models/`.
 
 ## Requirements
 
 - Python 3.12+
-- [uv](https://github.com/astral-sh/uv) (recommended; see [Without uv](#without-uv) for a pip-based setup)
+- [uv](https://github.com/astral-sh/uv) (or use `pip install -e .` and drop the `uv run` prefix)
 
-## Without uv
-
-If you'd rather not install `uv`, set up a venv with `pip` and drop the `uv run` prefix from every command in this README:
-
-```bash
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-
-xdrgen generate profile.yaml -n 100
-```
-
-Dev tooling lives under the `dev` dependency group in `pyproject.toml`. Pip doesn't install groups today, so for the test suite / linter add them by hand:
-
-```bash
-pip install pytest pytest-asyncio respx ruff
-pytest -q
-```
-
-## Commands
-
-### `generate`
+## `generate`
 
 ```
 ░██    ░██ ░███████   ░█████████    ░██████  ░██████████ ░███    ░██
@@ -90,119 +69,49 @@ pytest -q
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-Produce coherent, production-like telemetry events as JSON, driven by an optional YAML profile. Each event is generated, validated through its Pydantic model (so field names and types match the real Defender XDR columns), and handed to a *sink* — `json` by default. Pick one with `--sink`; see [Sinks](#sinks) below for what ships and how to add more.
-
-Events are buffered in memory and flushed to the active sink every `--flush-every` events (default 10 000), as well as at the end of a run and on `Ctrl+C`. Neither finite (`-n`) nor `--indefinite` runs grow memory without bound, and no buffered event is ever lost.
-
-`--per-table` cross-cuts whichever sink is active — it changes how events are *grouped*, not where they're sent:
-
-- `--sink json` (default): one combined `./telemetry.json` array → with `--per-table`, one file per event under `./telemetry/{TableName}-{n:04d}.json`.
-- `--sink kafka`: every event to `--kafka-topic` (default `xdrgen`) → with `--per-table`, one topic per table named `{--kafka-topic-prefix}{TableName}` (default prefix `xdrgen.` → `xdrgen.CloudAppEvents`, `xdrgen.EmailEvents`, …).
-
-Both the YAML profile itself and its `tables:` key are optional — omit either to generate for every table that has a generator.
+Each event is validated through its Pydantic model (so field names and types match real Defender XDR columns) and handed to a *sink* — `json` by default.
 
 ```bash
-# All tables that have a generator, file sink, ./telemetry.json
+# All tables that have a generator, default file sink → ./telemetry.json
 uv run xdrgen generate
 
-# 100 events, no delay between them, into a custom file
+# 100 events, no delay, into a custom file
 uv run xdrgen generate -n 100 -i 0 -o ./out/cae.json
 
-# 100 events, one JSON file per event, into ./out/events/
-uv run xdrgen generate -n 100 -i 0 -o ./out/events --per-table
+# One JSON file per event
+uv run xdrgen generate -n 100 -o ./out/events --per-table
 
-# Stream events forever, one every 2 seconds, flushes after 10000 events or once interrupted
-uv run xdrgen generate --indefinite -i 2
-
-# Stream events forever, flush every 100 events
+# Stream forever, flush every 100 events
 uv run xdrgen generate --indefinite --flush-every 100
 
-# Stream to Kafka instead, single topic
+# Stream to Kafka
 uv run xdrgen generate --sink kafka --kafka-bootstrap localhost:9092
 ```
 
-Pass `--echo` to also stream every generated event to stdout as it is written, regardless of which sink is active — useful for piping or watching the stream live.
+`--per-table` cross-cuts whichever sink is active — it changes how events are *grouped*, not where they go. For `json` it becomes one file per event under `./telemetry/`; for `kafka` it becomes one topic per table (`{--kafka-topic-prefix}{TableName}`).
 
-#### Profile overrides
+### Profile
 
-The same YAML profile can carry an optional `overrides:` mapping to replace fixtures baked into the default `World`. Useful when you want the stream to look like it came from *your* tenant rather than the default `contoso.com` fixture. Every override key is optional; omit the whole block (or individual keys) to keep the defaults.
+The YAML profile is optional. Without one, every table that has a generator is emitted using the default `contoso.com` tenant fixture. With one, you can select a subset of tables and/or override fixtures (tenant id, domain, users, devices, IPs, user agents, conditional access policies, email templates, …) so the stream looks like it came from *your* tenant.
 
-The profile is validated by Pydantic models defined in [`world.py`](./world.py) (`Profile`, `Overrides`, plus the typed sub-models for `User`, `IPEntry`, `ClientApp`, etc.) — unknown keys, wrong shapes, and missing required sub-fields fail fast with a clear error from `xdrgen generate`. At runtime, `Profile.build_world()` produces a frozen `World` instance that is threaded into every generator, so overrides apply atomically with no module-level mutation.
-
-**Scalar overrides** (replace a single value):
-
-| Key | Default | Surfaces in |
-| --- | --- | --- |
-| `tenant_id` | `a1b2c3d4-5e6f-4071-8293-94a5b6c7d8e9` | Every `TenantId`, `OrganizationId` in `RawEventData` |
-| `tenant_domain` | `contoso.com` | Cloud / UPN domain, intra-org Message-Ids |
-| `on_prem_ad_domain` | `contoso.local` | `AccountDomain` on Identity* tables |
-| `on_prem_netbios_domain` | `CONTOSO` | NetBIOS form of the on-prem domain |
-| `on_prem_sid_prefix` | `S-1-5-21-1004336348-1177238915-682003330` | `AccountSid` prefix (per-user RID is appended) |
-
-**Collection overrides** (fully replace the default list — no merge):
-
-| Key | Item shape (required fields **bold**) | Used by |
-| --- | --- | --- |
-| `domain_controllers` | **`name`**, **`ip`**, **`device_id`** | Identity* tables |
-| `devices` | **`device_id`**, **`device_name`**, `os_platform`, `os_version`, `public_ip`, `local_ip`, `mac_address`, `machine_group`, `primary_user_upn` | Device* tables (DeviceEvents, DeviceProcessEvents, DeviceLogonEvents, …) |
-| `processes` | **`file_name`**, **`folder_path`**, **`company`**, **`description`**, **`internal_file_name`**, **`original_file_name`**, **`product_name`**, **`product_version`**, **`command_lines`**, `integrity_level`, `elevation`, `signature_status`, `signer_type`, `parent` | `InitiatingProcess*` columns on every Device* table |
-| `users` | **`display_name`**, **`upn`**, **`object_id`**, `type`, `device_name`, `device_id`, `last_password_change_days_ago`, `sam_account_name`, `sid_rid`, `given_name`, `surname`, `department`, `job_title`, `employee_id`, `city`, `country` | Almost every table |
-| `ips` | **`ip`**, **`city`**, **`state`**, **`country`**, **`isp`**, **`category`**, **`latitude`**, **`longitude`** | Source IPs across cloud and email tables |
-| `user_agents` | **`ua`**, **`platform`**, **`device_type`**, **`browser`** | `CloudAppEvents`, `EntraIdSignInEvents`, `IdentityLogonEvents` |
-| `resources` | **`name`**, **`id`** | `EntraIdSignInEvents.ResourceDisplayName` / `.ResourceId`, plus `EntraIdSpnSignInEvents` when overridden (otherwise SPN events fall back to a workload-identity-flavoured default) |
-| `client_apps` | **`name`**, **`app_id`** | `EntraIdSignInEvents.Application` / `.ApplicationId` |
-| `service_principals` | **`name`**, **`id`**, **`app_id`**, `is_managed_identity` | `EntraIdSpnSignInEvents.ServicePrincipalName` / `.ServicePrincipalId` / `.Application` / `.ApplicationId` |
-| `groups` | **`name`**, **`id`** | `GraphApiAuditEvents.RequestUri` (`/groups/{id}/…`) |
-| `conditional_access_policies` | **`id`**, **`displayName`**, `enforcedGrantControls`, `enforcedSessionControls` | `EntraIdSignInEvents.ConditionalAccessPolicies` |
-| `entra_sign_in_error_codes` | **`code`**, **`weight`**, `description` | `EntraIdSignInEvents.ErrorCode` distribution + `AuthenticationProcessingDetails` |
-| `entra_spn_sign_in_error_codes` | **`code`**, **`weight`**, `description` | `EntraIdSpnSignInEvents.ErrorCode` distribution |
-| `email_templates` | **`subject`**, **`sender_*`**, **`recipient_persona`**, **`direction`**, **`delivery_action`**, **`delivery_location`**, **`email_action`**, **`email_size`**, **`bulk_complaint_level`**, **`authentication_details`**, **`confidence_level`**, optional threat / policy fields, plus nested `attachments` (**`file_name`**, **`extension`**, **`file_type`**, **`file_size`**) and `urls` (**`url`**, **`domain`**, **`location`**) | Pre-built email pool feeding `EmailEvents` / `EmailAttachmentInfo` / `EmailPostDeliveryEvents` / `EmailUrlInfo` / `UrlClickEvents` (correlated by `NetworkMessageId`) |
-
-A fully documented example profile is shipped at the repo root as [`profile.example.yaml`](./profile.example.yaml) with sample values for every override — copy it and edit:
+A fully documented example is shipped at [`profile.example.yaml`](./profile.example.yaml) — copy it and edit:
 
 ```bash
 cp profile.example.yaml profile.yaml
 uv run xdrgen generate profile.yaml -n 100
 ```
 
-#### Examples
+The profile is validated by Pydantic models in [`world.py`](./world.py); unknown keys, wrong shapes, and missing required sub-fields fail fast.
 
-```bash
-# 100 events, no delay between them, into a custom file
-uv run xdrgen generate profile.yaml -n 100 -i 0 -o ./out/cae.json
+### Sinks
 
-# 100 events, one JSON file per event, into ./out/events/
-uv run xdrgen generate profile.yaml -n 100 -i 0 -o ./out/events --per-table
+Sinks live in [`sinks/`](./sinks/). Three ship today:
 
-# Stream events forever, one every 2 seconds (writes once interrupted)
-uv run xdrgen generate profile.yaml --indefinite -i 2
-```
+- **`json`** _(default)_ — JSON to disk. See `sinks/json.py`.
+- **`kafka`** — produces JSON to a Kafka broker via `kafka-python`. See `sinks/kafka.py`.
+- **`kustainer`** — ingests directly into [Kustainer](https://learn.microsoft.com/en-us/azure/data-explorer/kusto-emulator-overview), Microsoft's official Kusto/ADX emulator, using `.ingest inline`. See `sinks/kustainer.py`.
 
-#### Sinks
-
-Sinks live in [`sinks/`](./sinks/). Each module defines a sink (a `Sink`-protocol class — `write(batch)` and `close()`) plus a `build(...)` factory; `main._build_sink` returns one based on `--sink`. The `--per-table` and `--flush-every` flags are sink-agnostic — they're handled by `main` and apply uniformly to whichever sink is active.
-
-Three sinks ship today:
-
-- **`--sink json`** _(default)_ — JSON to disk. Single combined array, or per-event files with `--per-table`. See `sinks/json.py`.
-- **`--sink kafka`** — produces JSON to a Kafka broker via `kafka-python`. The table name is used as the message key so partitioning stays consistent per table. See `sinks/kafka.py`.
-- **`--sink kustainer`** — ingests directly into [Kustainer](https://learn.microsoft.com/en-us/azure/data-explorer/kusto-emulator-overview), Microsoft's official Kusto/ADX emulator, via the `azure-kusto-data` SDK. Each event lands in the table named after its Pydantic model (e.g. `CloudAppEvents`). The emulator does not implement streaming or queued ingestion, so the sink uses the universally-supported `.ingest inline` control command on the engine endpoint. See `sinks/kustainer.py`.
-
-##### Testing the Kafka sink locally
-
-A [`docker/docker-compose-kafka.yml`](./docker/docker-compose-kafka.yml) spins up a single-broker Kafka (KRaft mode, no Zookeeper) plus [Kafka UI](https://github.com/provectus/kafka-ui) so you can watch topics fill up:
-
-```bash
-docker compose -f docker/docker-compose-kafka.yml up -d
-uv run xdrgen generate -n 100 -i 0 --sink kafka --kafka-bootstrap localhost:9092
-# Then browse http://localhost:8080 → cluster `local` → Topics.
-```
-
-The compose file exposes two listeners on the broker — `localhost:9092` for clients on your host (xdrgen) and `kafka:29092` for clients on the compose network (Kafka UI). Mismatched listeners are the most common Kafka-in-Compose footgun; this split keeps both paths working.
-
-##### Testing the Kustainer sink locally
-
-A [`docker/docker-compose-kustainer.yml`](./docker/docker-compose-kustainer.yml) spins up the official `kustainer-linux` image (single HTTP endpoint on `8080`, unauthenticated, `NetDefaultDB` database). Tables aren't created automatically by the sink — bootstrap them once with [`scripts/create_kustainer_tables.py`](./scripts/create_kustainer_tables.py), which walks every Pydantic model under `./models/` and emits a `.create-merge table` for each. Re-running it after `xdrgen update-models` is safe — `.create-merge` only adds new columns, it never drops existing data.
+Compose files for local Kafka and Kustainer are under [`docker/`](./docker/). For Kustainer, bootstrap tables once with [`scripts/create_kustainer_tables.py`](./scripts/create_kustainer_tables.py) before ingesting:
 
 ```bash
 docker compose -f docker/docker-compose-kustainer.yml up -d
@@ -210,146 +119,28 @@ uv run python scripts/create_kustainer_tables.py
 uv run xdrgen generate -n 100 -i 0 --sink kustainer
 ```
 
-The script and the sink share their type mapping (`str`→`string`, `int`→`long`, `bool`→`bool`, `float`→`real`, `datetime`→`datetime`, anything else→`dynamic`) so the schema the script writes always matches the rows the sink emits. Pass `--dry-run` to print the control commands without touching the cluster, and `--cluster` / `--database` to point at a non-default emulator.
+### Supported tables
 
-###### Querying the local emulator
+Handcrafted generators currently exist for: `CloudAppEvents`, `DeviceEvents`, `DeviceFileCertificateInfo`, `DeviceImageLoadEvents`, `DeviceLogonEvents`, `DeviceNetworkEvents`, `DeviceNetworkInfo`, `DeviceProcessEvents`, `DeviceRegistryEvents`, `EmailAttachmentInfo`, `EmailEvents`, `EmailPostDeliveryEvents`, `EmailUrlInfo`, `EntraIdSignInEvents`, `EntraIdSpnSignInEvents`, `GraphApiAuditEvents`, `IdentityAccountInfo`, `IdentityDirectoryEvents`, `IdentityEvents`, `IdentityLogonEvents`, `IdentityQueryEvents`, `UrlClickEvents`.
 
-Kustainer speaks the standard Kusto REST API at `http://localhost:8080/v1/rest/query` (queries) and `/v1/rest/mgmt` (control commands). Anything that talks to a real ADX cluster works against it — the only difference is the URL and the lack of authentication.
+Per-table specifics live in [`generators/PRODUCTION_LIKE_DATA.md`](./generators/PRODUCTION_LIKE_DATA.md). Listing an unsupported table in a profile fails fast with the available list.
 
-The lowest-friction option is the [Azure Data Explorer Web UI](https://dataexplorer.azure.com): sign in to your Microsoft account, click *+ Add* -> *Connection*, paste `http://localhost:8080` in the *Connection URI* text field and you get the same query editor you'd use against a real cluster. Browser-side it's a JS app; queries go directly from your browser to `localhost:8080`.
+## `update-models`
 
-For a one-shot `curl`:
-
-```bash
-curl -s http://localhost:8080/v1/rest/query \
-  -H 'Content-Type: application/json' \
-  -d '{"db":"NetDefaultDB","csl":"CloudAppEvents | take 5"}'
-```
-
-Or from Python via the same SDK the sink uses:
-
-```python
-from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
-
-kcsb = KustoConnectionStringBuilder.with_no_authentication("http://localhost:8080")
-client = KustoClient(kcsb)
-response = client.execute("NetDefaultDB", "CloudAppEvents | summarize count() by ActionType")
-for row in response.primary_results[0]:
-    print(row["ActionType"], row["count_"])
-```
-
-`.show tables` (control command, run via `execute_mgmt`) is the quickest way to confirm the bootstrap script created everything before you start ingesting.
-
-The image is x86_64 only; on Apple Silicon, set `--platform linux/amd64` in the compose file (Docker emulates, so it is slow). The emulator has no separate ingest URI, no streaming ingestion, no queued ingestion, and no authentication — `mcr.microsoft.com/azuredataexplorer/kustainer-linux` is for local development only.
-
-#### Production-like data
-
-The generators are hand-curated per table to produce realistic, *correlated* values rather than random noise — a single tenant ID, the same user pool, the same IP-to-geo mapping, and user agents paired with their matching OS / browser. Per-table specifics (what each generator does to mirror real Defender data) live in [`generators/PRODUCTION_LIKE_DATA.md`](./generators/PRODUCTION_LIKE_DATA.md).
-
-#### Supported tables
-
-The `generate` command currently has handcrafted generators for:
-
-- `CloudAppEvents`
-- `DeviceEvents`
-- `DeviceFileCertificateInfo`
-- `DeviceImageLoadEvents`
-- `DeviceLogonEvents`
-- `DeviceNetworkEvents`
-- `DeviceNetworkInfo`
-- `DeviceProcessEvents`
-- `DeviceRegistryEvents`
-- `EmailAttachmentInfo`
-- `EmailEvents`
-- `EmailPostDeliveryEvents`
-- `EmailUrlInfo`
-- `EntraIdSignInEvents`
-- `EntraIdSpnSignInEvents`
-- `GraphApiAuditEvents`
-- `IdentityAccountInfo`
-- `IdentityDirectoryEvents`
-- `IdentityEvents`
-- `IdentityLogonEvents`
-- `IdentityQueryEvents`
-- `UrlClickEvents`
-
-Listing a table in the YAML that does not have a generator yet will fail fast with a list of available tables. More generators will be added over time.
-
-### `update-models`
-
-Fetches three CSVs from `Azure/Azure-Sentinel/Tools/Solutions Analyzer/`:
-
-- `tables.csv` and `tables_reference.csv` — overlapping table catalogues. The union of rows whose `category` column contains `xdr` or `mde` (case-insensitive) defines the Defender XDR / MDE table set.
-- `table_schemas.csv` — column-level schemas (table name, column name, type, description).
-
-It then writes one Pydantic model per table into `./models/`.
+Fetches the table catalogue and column schemas from `Azure/Azure-Sentinel/Tools/Solutions Analyzer/`, filters to rows whose `category` contains `xdr` or `mde`, and writes one Pydantic model per table into `./models/`.
 
 ```bash
 uv run xdrgen update-models
 ```
 
-System columns starting with `_` (e.g. `_BilledSize`, `_IsBillable`, `_ResourceId`) are skipped — only first-class table columns become model fields. All fields are `Optional[T] = Field(None, ...)` because XDR events are inherently sparse. Column descriptions from the source docs become Pydantic field descriptions.
-
-```python
-from models import CloudAppEvents
-
-event = CloudAppEvents(
-    ActionType="FileDownloaded",
-    AccountDisplayName="Avery Chen",
-    IPAddress="20.43.122.12",
-)
-```
-
-You usually don't need to run this yourself — a [GitHub Actions workflow](./.github/workflows/update-models.yml) runs `update-models` daily at 06:00 UTC against `main`, and any diff in `./models/` is opened as a PR and squash-merged once lint and tests pass. So `main` always tracks the latest upstream Defender XDR / MDE schemas.
+All fields are `Optional[T] = Field(None, ...)` because XDR events are inherently sparse. You usually don't need to run this yourself — a [daily GitHub Actions workflow](./.github/workflows/update-models.yml) opens a PR with any schema drift, so `main` tracks upstream.
 
 ## Development
 
-Everything below is for working on `xdrgen` itself, not for using the CLI.
-
-### Formatting
-
-The codebase is formatted with [`ruff`](https://github.com/astral-sh/ruff) (target Python 3.12, configured in `pyproject.toml`). Always run `ruff format` before committing changes:
-
 ```bash
-# Format every file in-place
-uv run ruff format .
-
-# Or just check for drift without writing
-uv run ruff format --check .
+uv run ruff format .       # format
+uv run ruff check --fix .  # lint
+uv run pytest -q           # test
 ```
 
-### Linting
-
-The codebase is also linted with [`ruff`](https://github.com/astral-sh/ruff) (target Python 3.12, configured in `pyproject.toml`). Always run `ruff check --fix` before committing changes — safe fixes are applied automatically; anything left is for you to address:
-
-```bash
-# Lint every file and apply safe fixes in-place
-uv run ruff check --fix .
-
-# Or just report issues without writing
-uv run ruff check .
-```
-
-### Running tests
-
-The test suite lives under `tests/` and runs with `pytest`:
-
-```bash
-# Run everything
-uv run pytest
-
-# Run a single file
-uv run pytest tests/test_telemetry.py
-
-# Run a single test by name
-uv run pytest tests/test_telemetry.py::test_identity_logon_events_terminate_at_a_known_dc
-
-# Quieter output
-uv run pytest -q
-```
-
-### Adding a new sink
-
-1. Drop a module in `sinks/` (e.g. `sinks/s3.py`) that exports a class implementing the `Sink` protocol from `sinks/base.py` plus a top-level `build(...)` factory returning an instance.
-2. Add an entry to the `SinkChoice` enum in `main.py` and a branch in `_build_sink` that calls your factory with the relevant CLI flags.
-3. Add CLI flags for any sink-specific config (mirror the `--kafka-*` pattern), and a unit test in `tests/test_sinks.py` that stubs out the underlying client so it doesn't need real infrastructure.
+To add a new sink: drop a module in `sinks/` implementing the `Sink` protocol from `sinks/base.py` plus a `build(...)` factory, add an entry to `SinkChoice` and a branch in `_build_sink` in `main.py`, and add a unit test in `tests/test_sinks.py`.
