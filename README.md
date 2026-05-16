@@ -2,7 +2,7 @@
 
 `xdrgen` is a CLI tool that generates production-like Defender XDR telemetry based on a provided YAML profile.
 
-> **⚠️ Experimental / heavily vibe-coded.** The generated telemetry **will** contain errors — wrong enum values, fields that wouldn't co-occur in real Defender data, distributions that don't match production, etc. Don't rely on it for anything that matters until each table has been evaluated against real-world samples.
+> **⚠️ Experimental / heavily vibe-coded.** The telemetry generated without a very specific profile **will** contain errors — wrong enum values, fields that wouldn't co-occur in real Defender data, distributions that don't match production, etc. Don't rely on it for anything that matters until each table has been evaluated against real-world samples.
 
 Two commands:
 
