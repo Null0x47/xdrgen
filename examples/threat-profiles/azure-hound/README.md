@@ -94,11 +94,12 @@ GraphApiAuditEvents
 | where TotalCount > 1000
 ```
 
-The Defender Advanced Hunting table is `GraphAPIAuditEvents` (uppercase
-`API`); `xdrgen`'s Pydantic model and Kustainer schema use
-`GraphApiAuditEvents` to match the column naming convention used elsewhere
-in this repo. Adjust the table name if you copy this query into a real
-Sentinel / Defender XDR workspace.
+The Defender Advanced Hunting table is
+[`GraphApiAuditEvents`](https://learn.microsoft.com/en-us/defender-xdr/advanced-hunting-graphapiauditevents-table) —
+matching `xdrgen`'s Pydantic model and Kustainer schema. The cloudbrothers
+post spells it `GraphAPIAuditEvents` (uppercase `API`), which doesn't match
+the Microsoft schema; the query above uses the documented casing so it runs
+unchanged against a real Sentinel / Defender XDR workspace.
 
 The original `ingestion_time() > ago(1h)` filter is dropped here because
 `xdrgen` writes events whose `Timestamp` is "now" but Kustainer's
