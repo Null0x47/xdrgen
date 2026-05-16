@@ -35,38 +35,40 @@ Two commands:
  without bound. The buffer is also flushed on `Ctrl+C` and at the end of
  a finite run, so no event written to memory is ever lost.
 
-╭─ Arguments ──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│   profile      [PROFILE]  Optional YAML profile selecting tables and overriding tenant fixtures.                     │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭─ Options ────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ --output                  -o      PATH                    Output path. Defaults to `./telemetry.json`, or            │
-│                                                           `./telemetry/` with `--per-table`.                         │
-│ --count                   -n      INTEGER RANGE [x>=1]    Number of events to generate (ignored with --indefinite).  │
-│                                                           [default: 10]                                              │
-│ --indefinite                                              Run until interrupted with Ctrl+C.                         │
-│ --interval                -i      FLOAT RANGE [x>=0.0]    Seconds to wait between events. [default: 1.0]             │
-│ --echo                                                    Also print each event to stdout.                           │
-│ --per-table                                               Group events per-table: one file per event (file sink) or  │
-│                                                           one topic per table (kafka).                               │
-│ --flush-every                     INTEGER RANGE [x>=1]    Buffer this many events before flushing to the active      │
-│                                                           sink.                                                      │
-│                                                           [default: 10000]                                           │
-│ --sink                            [json|kafka|kustainer]  Destination for events: `json`, `kafka`, or `kustainer`.   │
-│                                                           [default: json]                                            │
-│ --kafka-bootstrap                 TEXT                    Kafka bootstrap servers, e.g. `localhost:9092`. Required   │
-│                                                           for --sink kafka.                                          │
-│ --kafka-topic                     TEXT                    Kafka topic to produce to (ignored with --per-table).      │
-│                                                           [default: xdrgen]                                          │
-│ --kafka-topic-prefix              TEXT                    Prefix for per-table Kafka topic names (only with          │
-│                                                           --per-table).                                              │
-│                                                           [default: xdrgen.]                                         │
-│ --kustainer-cluster               TEXT                    Kustainer (Kusto emulator) HTTP endpoint.                  │
-│                                                           [default: http://localhost:8080]                           │
-│ --kustainer-database              TEXT                    Kustainer database events are ingested into.               │
-│                                                           [default: NetDefaultDB]                                    │
-│ --kustainer-table-prefix          TEXT                    Prefix prepended to every Kustainer table name.            │
-│ --help                                                    Show this message and exit.                                │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Arguments ─────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│   profile      [PROFILE]  Optional YAML profile selecting tables and overriding tenant fixtures.                    │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --output                  -o      PATH                        Output path. Defaults to `./telemetry.json`, or       │
+│                                                               `./telemetry/` with `--per-table`.                    │
+│ --count                   -n      INTEGER RANGE [x>=1]        Number of events to generate (ignored with            │
+│                                                               --indefinite).                                        │
+│                                                               [default: 10]                                         │
+│ --indefinite                                                  Run until interrupted with Ctrl+C.                    │
+│ --interval                -i      FLOAT RANGE [x>=0.0]        Seconds to wait between events. [default: 1.0]        │
+│ --echo                                                        Also print each event to stdout.                      │
+│ --per-table                                                   Group events per-table: one file per event (file      │
+│                                                               sink) or one topic per table (kafka).                 │
+│ --flush-every                     INTEGER RANGE [x>=1]        Buffer this many events before flushing to the active │
+│                                                               sink.                                                 │
+│                                                               [default: 10000]                                      │
+│ --sink                            [json|csv|kafka|kustainer]  Destination for events: `json`, `csv`, `kafka`, or    │
+│                                                               `kustainer`.                                          │
+│                                                               [default: json]                                       │
+│ --kafka-bootstrap                 TEXT                        Kafka bootstrap servers, e.g. `localhost:9092`.       │
+│                                                               Required for --sink kafka.                            │
+│ --kafka-topic                     TEXT                        Kafka topic to produce to (ignored with --per-table). │
+│                                                               [default: xdrgen]                                     │
+│ --kafka-topic-prefix              TEXT                        Prefix for per-table Kafka topic names (only with     │
+│                                                               --per-table).                                         │
+│                                                               [default: xdrgen.]                                    │
+│ --kustainer-cluster               TEXT                        Kustainer (Kusto emulator) HTTP endpoint.             │
+│                                                               [default: http://localhost:8080]                      │
+│ --kustainer-database              TEXT                        Kustainer database events are ingested into.          │
+│                                                               [default: NetDefaultDB]                               │
+│ --kustainer-table-prefix          TEXT                        Prefix prepended to every Kustainer table name.       │
+│ --help                                                        Show this message and exit.                           │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 Each event is validated through its Pydantic model (so field names and types match real Defender XDR columns) and handed to a *sink* — `json` by default.
@@ -86,9 +88,12 @@ uv run xdrgen generate --indefinite --flush-every 100
 
 # Stream to Kafka
 uv run xdrgen generate --sink kafka --kafka-bootstrap localhost:9092
+
+# CSV output (default → ./telemetry.csv; --per-table → ./telemetry/{Table}-{n}.csv)
+uv run xdrgen generate --sink csv
 ```
 
-`--per-table` cross-cuts whichever sink is active — it changes how events are *grouped*, not where they go. For `json` it becomes one file per event under `./telemetry/`; for `kafka` it becomes one topic per table (`{--kafka-topic-prefix}{TableName}`).
+`--per-table` cross-cuts whichever sink is active — it changes how events are *grouped*, not where they go. For `json` and `csv` it becomes one file per event under `./telemetry/`; for `kafka` it becomes one topic per table (`{--kafka-topic-prefix}{TableName}`).
 
 ### Profile
 
@@ -111,9 +116,10 @@ Ready-made profiles that shape the output stream like a specific attack techniqu
 
 ### Sinks
 
-Sinks live in [`sinks/`](./sinks/). Three ship today:
+Sinks live in [`sinks/`](./sinks/). Four ship today:
 
 - **`json`** _(default)_ — JSON to disk. See `sinks/json.py`.
+- **`csv`** — CSV to disk. Default mode writes a single `./telemetry.csv` with a `_table,event_json` wrapper so heterogeneous events fit one file; `--per-table` writes one CSV per event under `./telemetry/` with the event's model columns as the header. See `sinks/csv.py`.
 - **`kafka`** — produces JSON to a Kafka broker via `kafka-python`. See `sinks/kafka.py`.
 - **`kustainer`** — ingests directly into [Kustainer](https://learn.microsoft.com/en-us/azure/data-explorer/kusto-emulator-overview), Microsoft's official Kusto/ADX emulator, using `.ingest inline`. See `sinks/kustainer.py`.
 

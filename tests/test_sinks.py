@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import pathlib
 from datetime import datetime
@@ -7,6 +8,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from sinks import csv as csv_sink
 from sinks import json as json_sink
 from sinks import kafka as kafka_sink
 from sinks import kustainer as kustainer_sink
@@ -284,3 +286,100 @@ def test_json_sink_build_picks_json_array_by_default(tmp_path: pathlib.Path):
     sink = json_sink.build(out_file, per_table=False)
     assert isinstance(sink, json_sink.JsonArraySink)
     sink.close()
+
+
+def test_csv_sink_build_picks_per_table_when_flag_set(tmp_path: pathlib.Path):
+    out_dir = tmp_path / "out"
+    sink = csv_sink.build(out_dir, per_table=True)
+    assert isinstance(sink, csv_sink.PerTableCsvSink)
+    sink.close()
+
+
+def test_csv_sink_build_picks_single_file_by_default(tmp_path: pathlib.Path):
+    out_file = tmp_path / "out.csv"
+    sink = csv_sink.build(out_file, per_table=False)
+    assert isinstance(sink, csv_sink.CsvSingleFileSink)
+    sink.close()
+
+
+def test_csv_single_file_sink_writes_header_and_one_row_per_event(
+    tmp_path: pathlib.Path,
+):
+    out_file = tmp_path / "out.csv"
+    sink = csv_sink.CsvSingleFileSink(out_file)
+    sink.write(
+        [
+            ("CloudAppEvents", _StubEvent("CloudAppEvents")),
+            ("EmailEvents", _StubEvent("EmailEvents")),
+        ]
+    )
+    sink.close()
+
+    rows = list(csv.reader(out_file.open("r", encoding="utf-8")))
+    assert rows[0] == ["_table", "event_json"]
+    assert rows[1] == ["CloudAppEvents", '{"table": "CloudAppEvents"}']
+    assert rows[2] == ["EmailEvents", '{"table": "EmailEvents"}']
+
+
+def test_per_table_csv_sink_writes_one_file_per_event_with_model_columns(
+    tmp_path: pathlib.Path,
+):
+    sink = csv_sink.PerTableCsvSink(tmp_path)
+    sink.write(
+        [
+            (
+                "Sample",
+                _SampleEvent(
+                    Name="hello, world",
+                    Count=42,
+                    Score=3.5,
+                    Active=True,
+                    Timestamp=datetime(2024, 1, 2, 3, 4, 5),
+                    Payload={"k": "v"},
+                    type="alpha",
+                ),
+            ),
+            ("Sample", _SampleEvent(Name="second")),
+        ]
+    )
+    sink.close()
+
+    first = list(csv.reader((tmp_path / "Sample-0000.csv").open("r", encoding="utf-8")))
+    assert first[0] == [
+        "Name",
+        "Count",
+        "Score",
+        "Active",
+        "Timestamp",
+        "Payload",
+        "type",
+    ]
+    assert first[1] == [
+        "hello, world",
+        "42",
+        "3.5",
+        "true",
+        "2024-01-02T03:04:05",
+        '{"k": "v"}',
+        "alpha",
+    ]
+
+    second = list(
+        csv.reader((tmp_path / "Sample-0001.csv").open("r", encoding="utf-8"))
+    )
+    assert second[1] == ["second", "", "", "", "", "", ""]
+
+
+def test_per_table_csv_sink_counter_is_per_table(tmp_path: pathlib.Path):
+    sink = csv_sink.PerTableCsvSink(tmp_path)
+    sink.write(
+        [
+            ("SampleA", _SampleEvent(Name="a")),
+            ("SampleB", _SampleEvent(Name="b")),
+            ("SampleA", _SampleEvent(Name="c")),
+        ]
+    )
+    sink.close()
+
+    names = sorted(p.name for p in tmp_path.iterdir())
+    assert names == ["SampleA-0000.csv", "SampleA-0001.csv", "SampleB-0000.csv"]

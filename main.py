@@ -23,6 +23,7 @@ except ImportError:
     GENERATORS: dict = {}
 
 from sinks import Sink
+from sinks import csv as csv_sink
 from sinks import json as json_sink
 from sinks import kafka as kafka_sink
 from sinks import kustainer as kustainer_sink
@@ -31,6 +32,7 @@ from world import Profile
 
 class SinkChoice(str, enum.Enum):
     json = "json"
+    csv = "csv"
     kafka = "kafka"
     kustainer = "kustainer"
 
@@ -145,6 +147,8 @@ def _build_sink(
     """Build the active sink for `--sink`."""
     if sink_choice is SinkChoice.json:
         return json_sink.build(output, per_table=per_table)
+    if sink_choice is SinkChoice.csv:
+        return csv_sink.build(output, per_table=per_table)
     if sink_choice is SinkChoice.kafka:
         if not kafka_bootstrap:
             raise typer.BadParameter(
@@ -217,7 +221,7 @@ def generate(
     sink: SinkChoice = typer.Option(
         SinkChoice.json,
         "--sink",
-        help="Destination for events: `json`, `kafka`, or `kustainer`.",
+        help="Destination for events: `json`, `csv`, `kafka`, or `kustainer`.",
     ),
     kafka_bootstrap: str | None = typer.Option(
         None,
@@ -260,11 +264,12 @@ def generate(
     world = prof.build_world()
 
     if output is None:
-        output = (
-            pathlib.Path("./telemetry")
-            if per_table
-            else pathlib.Path("./telemetry.json")
-        )
+        if per_table:
+            output = pathlib.Path("./telemetry")
+        elif sink is SinkChoice.csv:
+            output = pathlib.Path("./telemetry.csv")
+        else:
+            output = pathlib.Path("./telemetry.json")
 
     mode = "indefinite" if indefinite else f"{count} event(s)"
     typer.echo(f"Generating {mode} (tables={tables}, interval={interval}s)")
@@ -303,7 +308,7 @@ def generate(
             active_sink.write(buffer)
         active_sink.close()
 
-    if sink is SinkChoice.json:
+    if sink is SinkChoice.json or sink is SinkChoice.csv:
         destination = str(output)
     elif sink is SinkChoice.kafka:
         destination = f"kafka://{kafka_bootstrap}"
