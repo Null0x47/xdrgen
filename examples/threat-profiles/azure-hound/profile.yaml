@@ -1,0 +1,131 @@
+# AzureHound threat profile — replays the 14 Graph endpoints flagged by
+# https://cloudbrothers.info/detect-threats-graphapiauditevents-part-3/
+# See README.md in this directory for usage and the detection KQL.
+
+tables:
+  - GraphApiAuditEvents
+
+overrides:
+  tenant_id: 99999999-aaaa-bbbb-cccc-dddddddddddd
+  tenant_domain: northwind.com
+
+  # Single compromised operator — funnels all events to one ObjectId.
+  users:
+    - display_name: Morgan Hale
+      upn: morgan.hale@northwind.com
+      object_id: f1e2d3c4-b5a6-4798-8a9b-0c1d2e3f4a5b
+      type: Regular
+      sam_account_name: morgan.hale
+      sid_rid: 1199
+      given_name: Morgan
+      surname: Hale
+      department: IT
+      job_title: Cloud Engineer
+      city: Amsterdam
+      country: NL
+
+  # Public client app IDs AzureHound's device-code / ROPC flows use.
+  client_apps:
+    - name: Microsoft Azure CLI
+      app_id: 04b07795-8ddb-461a-bbee-02f9e1bf7b46
+    - name: Microsoft Azure PowerShell
+      app_id: 1950a258-227b-4e31-a9cf-717495945fc2
+
+  # Pin Location — one operator routes through one Graph frontend region.
+  graph_api_locations:
+    - westeurope
+
+  # One egress IP — the operator's machine.
+  ips:
+    - ip: 185.220.101.45
+      city: Frankfurt
+      state: Hessen
+      country: DE
+      isp: Hetzner Online GmbH
+      category: ISP
+      latitude: "50.110924"
+      longitude: "8.682127"
+
+  # Targets feeding the {group_id}/{sp_id}/{device_id} URI placeholders.
+  groups:
+    - name: Tier-0 Admins
+      id: 11112222-3333-4444-5555-666677778888
+    - name: Privileged Role Holders
+      id: 22223333-4444-5555-6666-777788889999
+
+  service_principals:
+    - name: northwind-pim-automation
+      id: 33334444-5555-6666-7777-888899990000
+      app_id: 44445555-6666-7777-8888-999900001111
+      is_managed_identity: false
+
+  devices:
+    - device_id: 55556666-7777-8888-9999-000011112222
+      device_name: WIN-MORGAN-01.northwind.com
+      os_platform: Windows11
+      os_version: 10.0.22631.3737
+      public_ip: 185.220.101.45
+      local_ip: 10.10.20.41
+      mac_address: 00-15-5D-04-12-7A
+      machine_group: Engineering Workstations
+      primary_user_upn: morgan.hale@northwind.com
+
+  # The 14 endpoints AzureHound calls — versions pinned to match the
+  # detection's normalised URI set exactly (ConfidenceScore = 1.0).
+  graph_api_endpoints:
+    - method: GET
+      uri: /beta/servicePrincipals/{sp_id}/owners
+      workload: Microsoft.DirectoryServices
+      scope: Directory.Read.All
+    - method: GET
+      uri: /beta/groups/{group_id}/owners
+      workload: Microsoft.DirectoryServices
+      scope: GroupMember.Read.All
+    - method: GET
+      uri: /beta/groups/{group_id}/members
+      workload: Microsoft.DirectoryServices
+      scope: GroupMember.Read.All
+    - method: GET
+      uri: /v1.0/servicePrincipals/{sp_id}/appRoleAssignedTo
+      workload: Microsoft.DirectoryServices
+      scope: Application.Read.All
+    - method: GET
+      uri: /beta/applications/{app_id}/owners
+      workload: Microsoft.DirectoryServices
+      scope: Application.Read.All
+    - method: GET
+      uri: /beta/devices/{device_id}/registeredOwners
+      workload: Microsoft.DirectoryServices
+      scope: Device.Read.All
+    - method: GET
+      uri: /v1.0/users
+      workload: Microsoft.DirectoryServices
+      scope: User.Read.All
+    - method: GET
+      uri: /v1.0/applications
+      workload: Microsoft.DirectoryServices
+      scope: Application.Read.All
+    - method: GET
+      uri: /v1.0/groups
+      workload: Microsoft.DirectoryServices
+      scope: Group.Read.All
+    - method: GET
+      uri: /v1.0/roleManagement/directory/roleAssignments
+      workload: Microsoft.DirectoryServices
+      scope: RoleManagement.Read.Directory
+    - method: GET
+      uri: /v1.0/roleManagement/directory/roleDefinitions
+      workload: Microsoft.DirectoryServices
+      scope: RoleManagement.Read.Directory
+    - method: GET
+      uri: /v1.0/devices
+      workload: Microsoft.DirectoryServices
+      scope: Device.Read.All
+    - method: GET
+      uri: /v1.0/organization
+      workload: Microsoft.DirectoryServices
+      scope: Organization.Read.All
+    - method: GET
+      uri: /v1.0/servicePrincipals
+      workload: Microsoft.DirectoryServices
+      scope: Application.Read.All
