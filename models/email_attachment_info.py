@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class EmailAttachmentInfo(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     DetectionMethods: Optional[str] = Field(None, description="Sender email address in the from header, which is visible to email recipients on their email clients.")
     FileExtension: Optional[str] = Field(None, description="File extension of the attachment.")
     FileName: Optional[str] = Field(None, description="Name of the file that the recorded action was applied to.")

@@ -74,6 +74,7 @@ def generate(world: World) -> EmailEvents:
         ThreatClassification=email["threat_classification"],
         ThreatNames=email["threat_names"],
         ThreatTypes=threat_types,
+        Timestamp=timestamp,
         TimeGenerated=timestamp,
         To=[recipient.upn],
         Type="EmailEvents",

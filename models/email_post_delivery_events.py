@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class EmailPostDeliveryEvents(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     Action: Optional[str] = Field(None, description="Action taken on the entity")
     ActionResult: Optional[str] = Field(None, description="Result of the action")
     ActionTrigger: Optional[str] = Field(None, description="Indicates whether an action was triggered by an administrator (manually or through approval of a pending automated action), or by some special mechanism, such as a ZAP or String Delivery")

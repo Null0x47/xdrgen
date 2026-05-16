@@ -250,6 +250,16 @@ overrides:
     - name: Northwind LOB API
       id: 11112222-3333-4444-5555-666677778888
 
+  # Graph endpoints feeding GraphApiAuditEvents. URI may pin version
+  # (`/v1.0/...`, `/beta/...`) or use `{ver}` for random selection.
+  # Placeholders: {ver} {user_id} {group_id} {sp_id} {app_id} {device_id}
+  # {role_id} {drive_id} {team_id} {chat_id}.
+  graph_api_endpoints:
+    - method: GET
+      uri: /v1.0/users
+      workload: Microsoft.DirectoryServices
+      scope: User.Read.All
+
   # Entra ID groups. Surfaces as {group_id} in GraphApiAuditEvents.RequestUri.
   groups:
     - name: All Employees

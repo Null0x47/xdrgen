@@ -79,6 +79,7 @@ def generate(world: World) -> EmailPostDeliveryEvents:
         SourceSystem="Azure",
         TenantId=world.tenant_id,
         ThreatTypes=email["threat_types"],
+        Timestamp=timestamp,
         TimeGenerated=timestamp,
         Type="EmailPostDeliveryEvents",
     )

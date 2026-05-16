@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class EmailEvents(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     AdditionalFields: Optional[Any] = Field(None, description="Additional information about the entity or event.")
     AttachmentCount: Optional[int] = Field(None, description="Number of attachments in the email.")
     AuthenticationDetails: Optional[str] = Field(None, description="List of pass or fail verdicts by email authentication protocols like DMARC, DKIM, SPF or a combination of multiple authentication types (CompAuth).")

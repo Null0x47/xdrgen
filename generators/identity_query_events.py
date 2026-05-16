@@ -136,6 +136,7 @@ def generate(world: World) -> IdentityQueryEvents:
         TargetAccountUpn=target_account_upn,
         TargetDeviceName=target_device_name,
         TenantId=world.tenant_id,
+        Timestamp=timestamp,
         TimeGenerated=timestamp,
         Type="IdentityQueryEvents",
     )

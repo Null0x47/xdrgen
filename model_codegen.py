@@ -65,6 +65,17 @@ def _build_imports(columns: list[ColumnDef], source_filename: str) -> str:
 def generate_model_file(table: TableDef) -> tuple[str, str]:
     filename = model_name_to_filename(table.model_name)
     columns = [c for c in table.columns if not c.name.startswith("_")]
+    # Every Defender XDR event has a Timestamp in practice; the upstream
+    # Solutions Analyzer schemas omit it for some tables, so inject it.
+    if not any(c.name == "Timestamp" for c in columns):
+        columns.insert(
+            0,
+            ColumnDef(
+                name="Timestamp",
+                xdr_type="datetime",
+                description="Date and time when the event was recorded",
+            ),
+        )
     imports = _build_imports(columns, table.source_filename)
 
     field_lines: list[str] = []

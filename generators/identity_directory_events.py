@@ -68,6 +68,7 @@ def generate(world: World) -> IdentityDirectoryEvents:
         TargetAccountUpn=target.upn,
         TargetDeviceName=dc.name,
         TenantId=world.tenant_id,
+        Timestamp=timestamp,
         TimeGenerated=timestamp,
         Type="IdentityDirectoryEvents",
     )

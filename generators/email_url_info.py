@@ -20,6 +20,7 @@ def generate(world: World) -> EmailUrlInfo:
         ReportId=str(random.randint(10**15, 10**16 - 1)),
         SourceSystem="Azure",
         TenantId=world.tenant_id,
+        Timestamp=timestamp,
         TimeGenerated=timestamp,
         Type="EmailUrlInfo",
         Url=url["url"],

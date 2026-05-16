@@ -113,11 +113,13 @@ def initiating_process_fields(
 
 def envelope(world: World, device: Device) -> dict:
     """Common Device* columns; generators add Type + table-specific fields."""
+    ts = now_utc()
     return {
+        "Timestamp": ts,
         "DeviceId": device.device_id,
         "DeviceName": device.device_name,
         "MachineGroup": device.machine_group,
         "TenantId": world.tenant_id,
         "SourceSystem": "Linux" if device.os_platform == "Linux" else "OpsManager",
-        "TimeGenerated": now_utc(),
+        "TimeGenerated": ts,
     }

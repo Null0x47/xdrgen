@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class IdentityLogonEvents(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     AccountDisplayName: Optional[str] = Field(None, description="Name of the account user displayed in the address book")
     AccountDomain: Optional[str] = Field(None, description="Domain of the account")
     AccountName: Optional[str] = Field(None, description="User name of the account")

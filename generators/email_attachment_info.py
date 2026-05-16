@@ -34,6 +34,7 @@ def generate(world: World) -> EmailAttachmentInfo:
         TenantId=world.tenant_id,
         ThreatNames=email["threat_names"],
         ThreatTypes=email["threat_types"],
+        Timestamp=timestamp,
         TimeGenerated=timestamp,
         Type="EmailAttachmentInfo",
     )

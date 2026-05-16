@@ -62,7 +62,6 @@ from generators.entra_id_spn_sign_in_events import (
     generate as generate_spn,
 )
 from generators.graph_api_audit_events import (
-    _ENDPOINTS as GRAPH_ENDPOINTS,
     _STATUS_VALUES as GRAPH_STATUS_VALUES,
     generate as generate_graph_api,
 )
@@ -706,7 +705,7 @@ def test_graph_api_audit_events_request_uri_is_well_formed(_world):
 
 def test_graph_api_audit_events_status_codes_drawn_from_known_set(_world):
     valid_status = set(GRAPH_STATUS_VALUES)
-    valid_workloads = {e["workload"] for e in GRAPH_ENDPOINTS}
+    valid_workloads = {e.workload for e in _world.graph_api_endpoints}
     for _ in range(50):
         event = generate_graph_api(_world)
         assert event.ResponseStatusCode in valid_status
@@ -768,6 +767,90 @@ def test_graph_api_audit_events_group_override_constrains_uri():
                 saw_group_uri = True
                 assert group_id == "00000000-1111-2222-3333-444444444444"
     assert saw_group_uri, "expected the group endpoint to be exercised"
+
+
+def test_graph_api_audit_events_endpoint_override_constrains_uri():
+    """`graph_api_endpoints` override fully replaces the default catalogue
+    and pre-versioned URIs pin ApiVersion to the literal in the path."""
+    from world import GraphApiEndpoint, Overrides, Profile
+
+    prof = Profile(
+        tables=["GraphApiAuditEvents"],
+        overrides=Overrides(
+            graph_api_endpoints=[
+                GraphApiEndpoint(
+                    method="GET",
+                    uri="/beta/devices/{device_id}/registeredOwners",
+                    workload="Microsoft.DirectoryServices",
+                    scope="Device.Read.All",
+                ),
+                GraphApiEndpoint(
+                    method="GET",
+                    uri="/v1.0/organization",
+                    workload="Microsoft.DirectoryServices",
+                    scope="Organization.Read.All",
+                ),
+            ]
+        ),
+    )
+    world = prof.build_world()
+    valid_uris = {
+        "https://graph.microsoft.com/beta/devices/",
+        "https://graph.microsoft.com/v1.0/organization",
+    }
+    versions_seen = set()
+    for _ in range(200):
+        event = generate_graph_api(world)
+        assert any(event.RequestUri.startswith(p) for p in valid_uris), event.RequestUri
+        if event.RequestUri.endswith("/organization"):
+            assert event.ApiVersion == "v1.0"
+        elif "/beta/devices/" in event.RequestUri:
+            assert event.ApiVersion == "beta"
+        versions_seen.add(event.ApiVersion)
+    assert versions_seen == {"v1.0", "beta"}
+
+
+def test_azurehound_profile_loads_and_targets_detection_set():
+    """The shipped AzureHound profile generates only the 14 detection URIs."""
+    import pathlib
+    import re
+    import yaml
+    from world import Profile
+
+    raw = yaml.safe_load(
+        pathlib.Path("examples/threat-profiles/azure-hound/profile.yaml").read_text()
+    )
+    prof = Profile.model_validate(raw)
+    world = prof.build_world()
+
+    uuid_re = re.compile(
+        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+        r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+    )
+    azurehound_set = {
+        "https://graph.microsoft.com/beta/servicePrincipals/<UUID>/owners",
+        "https://graph.microsoft.com/beta/groups/<UUID>/owners",
+        "https://graph.microsoft.com/beta/groups/<UUID>/members",
+        "https://graph.microsoft.com/v1.0/servicePrincipals/<UUID>/appRoleAssignedTo",
+        "https://graph.microsoft.com/beta/applications/<UUID>/owners",
+        "https://graph.microsoft.com/beta/devices/<UUID>/registeredOwners",
+        "https://graph.microsoft.com/v1.0/users",
+        "https://graph.microsoft.com/v1.0/applications",
+        "https://graph.microsoft.com/v1.0/groups",
+        "https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments",
+        "https://graph.microsoft.com/v1.0/roleManagement/directory/roleDefinitions",
+        "https://graph.microsoft.com/v1.0/devices",
+        "https://graph.microsoft.com/v1.0/organization",
+        "https://graph.microsoft.com/v1.0/servicePrincipals",
+    }
+    seen = set()
+    for _ in range(600):
+        event = generate_graph_api(world)
+        normalised = uuid_re.sub("<UUID>", event.RequestUri).split("?")[0]
+        seen.add(normalised)
+    assert seen <= azurehound_set, seen - azurehound_set
+    # The 14 endpoints are uniformly sampled — 600 draws should cover all.
+    assert seen == azurehound_set, azurehound_set - seen
 
 
 def test_graph_api_audit_events_204_has_zero_response_size(_world):

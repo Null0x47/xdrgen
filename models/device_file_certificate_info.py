@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceFileCertificateInfo(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     CertificateCountersignatureTime: Optional[datetime] = Field(None, description="Date and time (UTC) the certificate was countersigned.")
     CertificateCreationTime: Optional[datetime] = Field(None, description="Date and time (UTC) the certificate was created.")
     CertificateExpirationTime: Optional[datetime] = Field(None, description="Certificate expiry date and time (UTC).")

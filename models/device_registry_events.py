@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceRegistryEvents(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     ActionType: Optional[str] = Field(None, description="Type of activity that triggered the event.")
     AppGuardContainerId: Optional[str] = Field(None, description="Identifier for the virtualized container used by Application Guard to isolate browser activity.")
     DeviceId: Optional[str] = Field(None, description="Unique identifier for the device in the service.")

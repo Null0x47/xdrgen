@@ -104,6 +104,7 @@ def generate(world: World) -> IdentityLogonEvents:
         TargetAccountDisplayName=user.display_name,
         TargetDeviceName=dc.name,
         TenantId=world.tenant_id,
+        Timestamp=timestamp,
         TimeGenerated=timestamp,
         Type="IdentityLogonEvents",
         UncommonForUser=[],

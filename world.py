@@ -134,6 +134,18 @@ class Group(BaseModel):
     id: str
 
 
+class GraphApiEndpoint(BaseModel):
+    """Graph endpoint emitted by GraphApiAuditEvents. URI may pin
+    `/v1.0/` or `/beta/` or template `{ver}` for random selection."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    method: str
+    uri: str
+    workload: str
+    scope: str
+
+
 class ConditionalAccessPolicy(BaseModel):
     """camelCase to match Graph — serialised into EntraIdSignInEvents.ConditionalAccessPolicies."""
 
@@ -1163,6 +1175,166 @@ _DEFAULT_EMAIL_TEMPLATES: tuple[EmailTemplate, ...] = (
 )
 
 
+_DEFAULT_GRAPH_API_ENDPOINTS: tuple[GraphApiEndpoint, ...] = (
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/users",
+        workload="Microsoft.DirectoryServices",
+        scope="User.Read.All",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/users/{user_id}",
+        workload="Microsoft.DirectoryServices",
+        scope="User.Read.All",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/users/{user_id}/manager",
+        workload="Microsoft.DirectoryServices",
+        scope="User.Read.All",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/users/{user_id}/memberOf",
+        workload="Microsoft.DirectoryServices",
+        scope="GroupMember.Read.All",
+    ),
+    GraphApiEndpoint(
+        method="PATCH",
+        uri="/{ver}/users/{user_id}",
+        workload="Microsoft.DirectoryServices",
+        scope="User.ReadWrite.All",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/groups",
+        workload="Microsoft.DirectoryServices",
+        scope="Group.Read.All",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/groups/{group_id}/members",
+        workload="Microsoft.DirectoryServices",
+        scope="GroupMember.Read.All",
+    ),
+    GraphApiEndpoint(
+        method="POST",
+        uri="/{ver}/groups/{group_id}/members/$ref",
+        workload="Microsoft.DirectoryServices",
+        scope="GroupMember.ReadWrite.All",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/applications",
+        workload="Microsoft.DirectoryServices",
+        scope="Application.Read.All",
+    ),
+    GraphApiEndpoint(
+        method="POST",
+        uri="/{ver}/applications",
+        workload="Microsoft.DirectoryServices",
+        scope="Application.ReadWrite.All",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/servicePrincipals",
+        workload="Microsoft.DirectoryServices",
+        scope="Application.Read.All",
+    ),
+    GraphApiEndpoint(
+        method="POST",
+        uri="/{ver}/servicePrincipals/{sp_id}/addPassword",
+        workload="Microsoft.DirectoryServices",
+        scope="Application.ReadWrite.All",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/directoryRoles",
+        workload="Microsoft.DirectoryServices",
+        scope="RoleManagement.Read.Directory",
+    ),
+    GraphApiEndpoint(
+        method="POST",
+        uri="/{ver}/directoryRoles/{role_id}/members/$ref",
+        workload="Microsoft.DirectoryServices",
+        scope="RoleManagement.ReadWrite.Directory",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/identity/conditionalAccess/policies",
+        workload="Microsoft.DirectoryServices",
+        scope="Policy.Read.All",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/me/messages",
+        workload="Microsoft.Exchange",
+        scope="Mail.Read",
+    ),
+    GraphApiEndpoint(
+        method="POST",
+        uri="/{ver}/me/sendMail",
+        workload="Microsoft.Exchange",
+        scope="Mail.Send",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/me/calendar/events",
+        workload="Microsoft.Exchange",
+        scope="Calendars.Read",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/sites/root/drives",
+        workload="Microsoft.SharePoint",
+        scope="Files.Read.All",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/drives/{drive_id}/root/children",
+        workload="Microsoft.SharePoint",
+        scope="Files.Read.All",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/teams/{team_id}/channels",
+        workload="Microsoft.Teams",
+        scope="Channel.ReadBasic.All",
+    ),
+    GraphApiEndpoint(
+        method="POST",
+        uri="/{ver}/chats/{chat_id}/messages",
+        workload="Microsoft.Teams",
+        scope="Chat.ReadWrite",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/auditLogs/signIns",
+        workload="Microsoft.Reports",
+        scope="AuditLog.Read.All",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/auditLogs/directoryAudits",
+        workload="Microsoft.Reports",
+        scope="AuditLog.Read.All",
+    ),
+    GraphApiEndpoint(
+        method="GET",
+        uri="/{ver}/security/alerts_v2",
+        workload="Microsoft.Security",
+        scope="SecurityAlert.Read.All",
+    ),
+    GraphApiEndpoint(
+        method="POST",
+        uri="/{ver}/security/runHuntingQuery",
+        workload="Microsoft.Security",
+        scope="ThreatHunting.Read.All",
+    ),
+)
+
+
 _DEFAULT_CA_POLICIES: tuple[ConditionalAccessPolicy, ...] = (
     ConditionalAccessPolicy(
         id="8d2d8c45-2f9f-4c5e-8b1a-1c12fbb1d9e6",
@@ -1203,6 +1375,7 @@ class World(BaseModel):
     service_principals: tuple[ServicePrincipal, ...] = _DEFAULT_SERVICE_PRINCIPALS
     resources: tuple[Resource, ...] = _DEFAULT_RESOURCES
     groups: tuple[Group, ...] = _DEFAULT_GROUPS
+    graph_api_endpoints: tuple[GraphApiEndpoint, ...] = _DEFAULT_GRAPH_API_ENDPOINTS
     conditional_access_policies: tuple[ConditionalAccessPolicy, ...] = (
         _DEFAULT_CA_POLICIES
     )
@@ -1236,6 +1409,7 @@ class Overrides(BaseModel):
     client_apps: Optional[list[ClientApp]] = None
     service_principals: Optional[list[ServicePrincipal]] = None
     groups: Optional[list[Group]] = None
+    graph_api_endpoints: Optional[list[GraphApiEndpoint]] = None
     conditional_access_policies: Optional[list[ConditionalAccessPolicy]] = None
     entra_sign_in_error_codes: Optional[list[WeightedErrorCode]] = None
     entra_spn_sign_in_error_codes: Optional[list[WeightedErrorCode]] = None

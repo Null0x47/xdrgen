@@ -3,172 +3,13 @@
 from __future__ import annotations
 
 import random
+import re
 import uuid
 
 from models import GraphApiAuditEvents
 from generators.base import register
 from generators.common import now_utc
 from world import World
-
-# Graph endpoint catalogue: (method, uri template, owning workload, scope).
-_ENDPOINTS: tuple[dict[str, str], ...] = (
-    {
-        "method": "GET",
-        "uri": "/{ver}/users",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "User.Read.All",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/users/{user_id}",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "User.Read.All",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/users/{user_id}/manager",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "User.Read.All",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/users/{user_id}/memberOf",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "GroupMember.Read.All",
-    },
-    {
-        "method": "PATCH",
-        "uri": "/{ver}/users/{user_id}",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "User.ReadWrite.All",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/groups",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "Group.Read.All",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/groups/{group_id}/members",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "GroupMember.Read.All",
-    },
-    {
-        "method": "POST",
-        "uri": "/{ver}/groups/{group_id}/members/$ref",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "GroupMember.ReadWrite.All",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/applications",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "Application.Read.All",
-    },
-    {
-        "method": "POST",
-        "uri": "/{ver}/applications",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "Application.ReadWrite.All",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/servicePrincipals",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "Application.Read.All",
-    },
-    {
-        "method": "POST",
-        "uri": "/{ver}/servicePrincipals/{sp_id}/addPassword",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "Application.ReadWrite.All",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/directoryRoles",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "RoleManagement.Read.Directory",
-    },
-    {
-        "method": "POST",
-        "uri": "/{ver}/directoryRoles/{role_id}/members/$ref",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "RoleManagement.ReadWrite.Directory",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/identity/conditionalAccess/policies",
-        "workload": "Microsoft.DirectoryServices",
-        "scope": "Policy.Read.All",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/me/messages",
-        "workload": "Microsoft.Exchange",
-        "scope": "Mail.Read",
-    },
-    {
-        "method": "POST",
-        "uri": "/{ver}/me/sendMail",
-        "workload": "Microsoft.Exchange",
-        "scope": "Mail.Send",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/me/calendar/events",
-        "workload": "Microsoft.Exchange",
-        "scope": "Calendars.Read",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/sites/root/drives",
-        "workload": "Microsoft.SharePoint",
-        "scope": "Files.Read.All",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/drives/{drive_id}/root/children",
-        "workload": "Microsoft.SharePoint",
-        "scope": "Files.Read.All",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/teams/{team_id}/channels",
-        "workload": "Microsoft.Teams",
-        "scope": "Channel.ReadBasic.All",
-    },
-    {
-        "method": "POST",
-        "uri": "/{ver}/chats/{chat_id}/messages",
-        "workload": "Microsoft.Teams",
-        "scope": "Chat.ReadWrite",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/auditLogs/signIns",
-        "workload": "Microsoft.Reports",
-        "scope": "AuditLog.Read.All",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/auditLogs/directoryAudits",
-        "workload": "Microsoft.Reports",
-        "scope": "AuditLog.Read.All",
-    },
-    {
-        "method": "GET",
-        "uri": "/{ver}/security/alerts_v2",
-        "workload": "Microsoft.Security",
-        "scope": "SecurityAlert.Read.All",
-    },
-    {
-        "method": "POST",
-        "uri": "/{ver}/security/runHuntingQuery",
-        "workload": "Microsoft.Security",
-        "scope": "ThreatHunting.Read.All",
-    },
-)
 
 # Weighted HTTP outcomes — 2xx dominates; failure tail covers 401/403/404/429.
 _STATUS_CODES: tuple[tuple[str, int], ...] = (
@@ -196,12 +37,14 @@ _LOCATIONS: tuple[str, ...] = (
 )
 
 
+_PINNED_VERSION_RE = re.compile(r"^/(v1\.0|beta)/")
+
+
 @register("GraphApiAuditEvents")
 def generate(world: World) -> GraphApiAuditEvents:
     user = random.choice(world.users)
     ip = random.choice(world.ips)
-    endpoint = random.choice(_ENDPOINTS)
-    api_version = random.choice(("v1.0", "beta"))
+    endpoint = random.choice(world.graph_api_endpoints)
     timestamp = now_utc()
 
     # ~60% delegated for humans; service accounts always app-only.
@@ -220,11 +63,17 @@ def generate(world: World) -> GraphApiAuditEvents:
         service_principal_id = client.app_id
 
     group = random.choice(world.groups)
-    uri_path = endpoint["uri"].format(
+    device = random.choice(world.devices)
+    # Pin ApiVersion if the URI hard-codes one; else randomise.
+    pinned = _PINNED_VERSION_RE.match(endpoint.uri)
+    api_version = pinned.group(1) if pinned else random.choice(("v1.0", "beta"))
+    uri_path = endpoint.uri.format(
         ver=api_version,
         user_id=user.object_id,
         group_id=group.id,
         sp_id=service_principal_id,
+        app_id=application_id,
+        device_id=device.device_id,
         role_id=str(uuid.uuid4()),
         drive_id=f"b!{uuid.uuid4().hex[:22]}",
         team_id=str(uuid.uuid4()),
@@ -240,7 +89,7 @@ def generate(world: World) -> GraphApiAuditEvents:
         response_size = random.randint(80, 600)
     elif status_code == "204":
         response_size = 0
-    elif endpoint["method"] == "GET":
+    elif endpoint.method == "GET":
         response_size = random.randint(800, 60_000)
     else:
         response_size = random.randint(300, 3_000)
@@ -258,12 +107,12 @@ def generate(world: World) -> GraphApiAuditEvents:
         Location=random.choice(_LOCATIONS),
         RequestDuration=str(random.randint(20, 1500)),
         RequestId=str(uuid.uuid4()),
-        RequestMethod=endpoint["method"],
+        RequestMethod=endpoint.method,
         Timestamp=timestamp.isoformat(),
         ResponseStatusCode=status_code,
-        Scopes=endpoint["scope"],
+        Scopes=endpoint.scope,
         UniqueTokenIdentifier=uuid.uuid4().hex,
-        TargetWorkload=endpoint["workload"],
+        TargetWorkload=endpoint.workload,
         ServicePrincipalId=service_principal_id,
         ResponseSize=response_size,
     )

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class UrlClickEvents(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     AccountUpn: Optional[str] = Field(None, description="User Principal Name of the account that clicked on the link.")
     ActionType: Optional[str] = Field(None, description="Indicates whether the click was allowed or blocked by 'safe links' or blocked due to a tenant policy e.g., from tenant allow block list.")
     AppName: Optional[str] = Field(None, description="The application's display name as exposed by the associated service principal.")

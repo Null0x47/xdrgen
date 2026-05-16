@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class CloudAppEvents(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     AccountDisplayName: Optional[str] = Field(None, description="Name displayed in the address book entry for the account user. This is usually a combination of the given name, middle initial, and surname of the user.")
     AccountId: Optional[str] = Field(None, description="An identifier for the account as found by Microsoft Cloud App Security. Could be Azure Active Directory ID, user principal name, or other identifiers")
     AccountObjectId: Optional[str] = Field(None, description="Unique identifier for the account in Azure AD")

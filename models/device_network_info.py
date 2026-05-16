@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceNetworkInfo(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     ConnectedNetworks: Optional[Any] = Field(None, description="Networks that the adapter is connected to. Each JSON element in the array contains the network name, category (public, private or domain), a description, and a flag indicating if it is connected publicly to the internet.")
     DefaultGateways: Optional[Any] = Field(None, description="Default gateway addresses in JSON array format.")
     DeviceId: Optional[str] = Field(None, description="Unique identifier for the device in the service.")

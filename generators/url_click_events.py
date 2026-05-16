@@ -83,6 +83,7 @@ def generate(world: World) -> UrlClickEvents:
         SourceId=str(uuid.uuid4()),
         SourceSystem="Azure",
         ThreatTypes=threat_types,
+        Timestamp=timestamp,
         TimeGenerated=timestamp,
         Type="UrlClickEvents",
         Url=url_entry["url"],

@@ -1,9 +1,16 @@
-# Local Kustainer (Kusto emulator) for the kustainer sink.
+# Local Kustainer (Kusto emulator) for the kustainer sink, plus the in-browser
+# KQL frontend.
 #   docker compose -f docker/docker-compose-kustainer.yml up -d
-#   uv run python scripts/create_kustainer_tables.py
 #   uv run xdrgen generate --sink kustainer
+#   open http://localhost:5173
 #
-# x86_64 only (Apple Silicon: --platform linux/amd64). ACCEPT_EULA=Y required.
+# Services:
+#   kustainer      — Microsoft's Kusto emulator (http://localhost:8080)
+#   kustainer-init — one-shot bootstrap: waits, creates tables + function stubs
+#   kustainer-frontend       — nginx-served React UI; proxies /api/kusto/* to kustainer
+#
+# Re-runs are safe (`.create-merge` / `.create-or-alter`). x86_64 only
+# (Apple Silicon: --platform linux/amd64). ACCEPT_EULA=Y required.
 # https://learn.microsoft.com/en-us/azure/data-explorer/kusto-emulator-overview
 
 services:
@@ -15,3 +22,45 @@ services:
     environment:
       ACCEPT_EULA: "Y"
     mem_limit: 4g
+
+  kustainer-init:
+    image: python:3.12-slim
+    container_name: xdrgen-kustainer-init
+    depends_on:
+      - kustainer
+    volumes:
+      - ..:/app:ro
+    working_dir: /app
+    environment:
+      PYTHONPATH: /app
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    restart: "no"
+    command:
+      - sh
+      - -ec
+      - |
+        pip install --quiet --no-cache-dir "azure-kusto-data>=4.6.0" "pydantic>=2.13.3"
+        echo "waiting for kustainer..."
+        until python - <<'PY' >/dev/null 2>&1
+        import json, urllib.request
+        req = urllib.request.Request(
+            "http://kustainer:8080/v1/rest/mgmt",
+            data=json.dumps({"db": "NetDefaultDB", "csl": ".show version"}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        urllib.request.urlopen(req, timeout=2).read()
+        PY
+        do sleep 2; done
+        echo "creating tables..."
+        python scripts/create_kustainer_tables.py --cluster http://kustainer:8080
+        echo "creating functions..."
+        python scripts/create_kustainer_functions.py --cluster http://kustainer:8080
+
+  kustainer-frontend:
+    build:
+      context: ../examples/kustainer-frontend
+    container_name: xdrgen-kustainer-frontend
+    depends_on:
+      - kustainer
+    ports:
+      - "5173:80"

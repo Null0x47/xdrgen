@@ -92,7 +92,7 @@ uv run xdrgen generate --sink kafka --kafka-bootstrap localhost:9092
 
 ### Profile
 
-The YAML profile is optional. Without one, every table that has a generator is emitted using the default `contoso.com` tenant fixture. With one, you can select a subset of tables and/or override fixtures (tenant id, domain, users, devices, IPs, user agents, conditional access policies, email templates, …) so the stream looks like it came from *your* tenant.
+The YAML profile is optional. Without one, every table that has a generator is emitted using the default `contoso.com` tenant fixture. With one, you can select a subset of tables and/or override fixtures (tenant id, domain, users, devices, IPs, user agents, conditional access policies, Graph API endpoint catalogue, email templates, …) so the stream looks like it came from *your* tenant.
 
 A fully documented example is shipped at [`profile.example.yaml`](./profile.example.yaml) — copy it and edit:
 
@@ -103,6 +103,12 @@ uv run xdrgen generate profile.yaml -n 100
 
 The profile is validated by Pydantic models in [`world.py`](./world.py); unknown keys, wrong shapes, and missing required sub-fields fail fast.
 
+#### Threat profiles
+
+Ready-made profiles that shape the output stream like a specific attack technique live in [`examples/threat-profiles/`](./examples/threat-profiles/):
+
+- [`azure-hound/`](./examples/threat-profiles/azure-hound/) — emits the 14 Microsoft Graph endpoints AzureHound walks during directory collection, sized to trip the [CloudBrothers GraphAPIAuditEvents detection](https://cloudbrothers.info/detect-threats-graphapiauditevents-part-3/).
+
 ### Sinks
 
 Sinks live in [`sinks/`](./sinks/). Three ship today:
@@ -111,13 +117,16 @@ Sinks live in [`sinks/`](./sinks/). Three ship today:
 - **`kafka`** — produces JSON to a Kafka broker via `kafka-python`. See `sinks/kafka.py`.
 - **`kustainer`** — ingests directly into [Kustainer](https://learn.microsoft.com/en-us/azure/data-explorer/kusto-emulator-overview), Microsoft's official Kusto/ADX emulator, using `.ingest inline`. See `sinks/kustainer.py`.
 
-Compose files for local Kafka and Kustainer are under [`docker/`](./docker/). For Kustainer, bootstrap tables once with [`scripts/create_kustainer_tables.py`](./scripts/create_kustainer_tables.py) before ingesting:
+Compose files for local Kafka and Kustainer are under [`docker/`](./docker/). The Kustainer compose file ships a `kustainer-init` sidecar that waits for the emulator and runs [`scripts/create_kustainer_tables.py`](./scripts/create_kustainer_tables.py) and [`scripts/create_kustainer_functions.py`](./scripts/create_kustainer_functions.py) automatically — re-runs are safe (`.create-merge` / `.create-or-alter`):
 
 ```bash
 docker compose -f docker/docker-compose-kustainer.yml up -d
-uv run python scripts/create_kustainer_tables.py
 uv run xdrgen generate -n 100 -i 0 --sink kustainer
 ```
+
+#### Kustainer Frontend
+
+For an in-browser KQL editor that queries the local Kustainer instance (Monaco-Kusto + AG Grid), see [`examples/kustainer-frontend/`](./examples/kustainer-frontend/). The kustainer compose file ships a `frontend` service that builds and serves the bundle behind nginx on http://localhost:5173 — no `npm install` needed.
 
 ### Supported tables
 

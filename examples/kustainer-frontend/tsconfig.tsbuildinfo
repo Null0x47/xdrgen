@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/KustoEditor.tsx","./src/PaneResizer.tsx","./src/ResultsGrid.tsx","./src/ResultsToolbar.tsx","./src/RowDetailDrawer.tsx","./src/kustainer.ts","./src/loadMonaco.ts","./src/main.tsx"],"version":"5.9.3"}

@@ -261,6 +261,7 @@ def generate(world: World) -> CloudAppEvents:
         SessionData={"SessionId": str(uuid.uuid4())},
         SourceSystem="Azure",
         TenantId=world.tenant_id,
+        Timestamp=timestamp,
         TimeGenerated=timestamp,
         Type="CloudAppEvents",
         UncommonForUser=[],
