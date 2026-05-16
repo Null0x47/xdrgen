@@ -853,6 +853,20 @@ def test_azurehound_profile_loads_and_targets_detection_set():
     assert seen == azurehound_set, azurehound_set - seen
 
 
+def test_graph_api_audit_events_location_override_constrains_region():
+    """`graph_api_locations` override fully replaces the default region pool."""
+    from world import Overrides, Profile
+
+    prof = Profile(
+        tables=["GraphApiAuditEvents"],
+        overrides=Overrides(graph_api_locations=["francecentral"]),
+    )
+    world = prof.build_world()
+    for _ in range(50):
+        event = generate_graph_api(world)
+        assert event.Location == "francecentral"
+
+
 def test_graph_api_audit_events_204_has_zero_response_size(_world):
     """204 No Content returns zero body bytes."""
     for _ in range(500):

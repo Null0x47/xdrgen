@@ -26,17 +26,6 @@ _STATUS_CODES: tuple[tuple[str, int], ...] = (
 _STATUS_VALUES, _STATUS_WEIGHTS = zip(*_STATUS_CODES)
 
 
-# Azure regions graph.microsoft.com requests terminate in.
-_LOCATIONS: tuple[str, ...] = (
-    "westeurope",
-    "northeurope",
-    "eastus",
-    "westus2",
-    "southeastasia",
-    "uksouth",
-)
-
-
 _PINNED_VERSION_RE = re.compile(r"^/(v1\.0|beta)/")
 
 
@@ -104,7 +93,7 @@ def generate(world: World) -> GraphApiAuditEvents:
         RequestUri=request_uri,
         AccountObjectId=account_object_id,
         OperationId=str(uuid.uuid4()),
-        Location=random.choice(_LOCATIONS),
+        Location=random.choice(world.graph_api_locations),
         RequestDuration=str(random.randint(20, 1500)),
         RequestId=str(uuid.uuid4()),
         RequestMethod=endpoint.method,

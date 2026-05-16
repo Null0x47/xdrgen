@@ -1335,6 +1335,18 @@ _DEFAULT_GRAPH_API_ENDPOINTS: tuple[GraphApiEndpoint, ...] = (
 )
 
 
+# Azure regions graph.microsoft.com requests terminate in — feeds
+# GraphApiAuditEvents.Location.
+_DEFAULT_GRAPH_API_LOCATIONS: tuple[str, ...] = (
+    "westeurope",
+    "northeurope",
+    "eastus",
+    "westus2",
+    "southeastasia",
+    "uksouth",
+)
+
+
 _DEFAULT_CA_POLICIES: tuple[ConditionalAccessPolicy, ...] = (
     ConditionalAccessPolicy(
         id="8d2d8c45-2f9f-4c5e-8b1a-1c12fbb1d9e6",
@@ -1376,6 +1388,7 @@ class World(BaseModel):
     resources: tuple[Resource, ...] = _DEFAULT_RESOURCES
     groups: tuple[Group, ...] = _DEFAULT_GROUPS
     graph_api_endpoints: tuple[GraphApiEndpoint, ...] = _DEFAULT_GRAPH_API_ENDPOINTS
+    graph_api_locations: tuple[str, ...] = _DEFAULT_GRAPH_API_LOCATIONS
     conditional_access_policies: tuple[ConditionalAccessPolicy, ...] = (
         _DEFAULT_CA_POLICIES
     )
@@ -1410,6 +1423,7 @@ class Overrides(BaseModel):
     service_principals: Optional[list[ServicePrincipal]] = None
     groups: Optional[list[Group]] = None
     graph_api_endpoints: Optional[list[GraphApiEndpoint]] = None
+    graph_api_locations: Optional[list[str]] = None
     conditional_access_policies: Optional[list[ConditionalAccessPolicy]] = None
     entra_sign_in_error_codes: Optional[list[WeightedErrorCode]] = None
     entra_spn_sign_in_error_codes: Optional[list[WeightedErrorCode]] = None

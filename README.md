@@ -92,7 +92,7 @@ uv run xdrgen generate --sink kafka --kafka-bootstrap localhost:9092
 
 ### Profile
 
-The YAML profile is optional. Without one, every table that has a generator is emitted using the default `contoso.com` tenant fixture. With one, you can select a subset of tables and/or override fixtures (tenant id, domain, users, devices, IPs, user agents, conditional access policies, Graph API endpoint catalogue, email templates, …) so the stream looks like it came from *your* tenant.
+The YAML profile is optional. Without one, every table that has a generator is emitted using the default `contoso.com` tenant fixture. With one, you can select a subset of tables and/or override fixtures (tenant id, domain, users, devices, IPs, user agents, conditional access policies, Graph API endpoint catalogue, Graph API regions, email templates, …) so the stream looks like it came from *your* tenant.
 
 A fully documented example is shipped at [`profile.example.yaml`](./profile.example.yaml) — copy it and edit:
 

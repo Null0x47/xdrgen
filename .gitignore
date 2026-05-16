@@ -14,6 +14,7 @@ wheels/
 # XDRGEN
 xdrgen.yaml
 profile.yaml
+!examples/**/profile.yaml
 telemetry.json
 
 # Claude
