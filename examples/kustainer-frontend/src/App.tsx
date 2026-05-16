@@ -8,7 +8,11 @@ import { RowDetailDrawer } from "./RowDetailDrawer";
 import { clearAllTablesData, runQuery, type QueryResult } from "./kustainer";
 import "./App.css";
 
-const DEFAULT_QUERY = "CloudAppEvents\n| take 10";
+const DEFAULT_QUERY = `DeviceProcessEvents
+| where Timestamp > ago(2d)
+| where (FileName =~ "cmd.exe" and ProcessCommandLine has_all ("curl -s -X POST -d", "packages.npm.org", "-w hidden -ep", ".ps1", "& del", ":8000"))
+   or (ProcessCommandLine has_all ("curl", "-d packages.npm.org/", "nohup", ".py", ":8000/", "> /dev/null 2>&1") and ProcessCommandLine contains "python")
+   or (ProcessCommandLine has_all ("curl", "-d packages.npm.org/", "com.apple.act.mond", "http://", ":8000/", "&> /dev/null"))`;
 
 const EDITOR_HEIGHT_KEY = "xdrgen-editor-height";
 const EDITOR_MIN_PX = 80;

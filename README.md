@@ -97,7 +97,7 @@ uv run xdrgen generate --sink csv
 
 ### Profile
 
-The YAML profile is optional. Without one, every table that has a generator is emitted using the default `contoso.com` tenant fixture. With one, you can select a subset of tables and/or override fixtures (tenant id, domain, users, devices, IPs, user agents, conditional access policies, Graph API endpoint catalogue, Graph API regions, email templates, …) so the stream looks like it came from *your* tenant.
+The YAML profile is optional. Without one, every table that has a generator is emitted using the default `contoso.com` tenant fixture. With one, you can select a subset of tables and/or override fixtures (tenant id, domain, users, devices, IPs, user agents, conditional access policies, Graph API endpoint catalogue, Graph API regions, outbound network destinations, registry targets, email templates, …) so the stream looks like it came from *your* tenant.
 
 A fully documented example is shipped at [`profile.example.yaml`](./profile.example.yaml) — copy it and edit:
 
@@ -113,6 +113,7 @@ The profile is validated by Pydantic models in [`world.py`](./world.py); unknown
 Ready-made profiles that shape the output stream like a specific attack technique live in [`examples/threat-profiles/`](./examples/threat-profiles/):
 
 - [`azure-hound/`](./examples/threat-profiles/azure-hound/) — emits the 14 Microsoft Graph endpoints AzureHound walks during directory collection, sized to trip the [CloudBrothers GraphAPIAuditEvents detection](https://cloudbrothers.info/detect-threats-graphapiauditevents-part-3/).
+- [`axios-npm/`](./examples/threat-profiles/axios-npm/) — replays the post-install dropper command lines from the trojanized `axios@1.14.1` / `axios@0.30.4` packages (via `plain-crypto-js@4.2.1`), shaped to fire the `DeviceProcessEvents` curl-execution query from Microsoft's [Axios npm supply-chain analysis](https://www.microsoft.com/en-us/security/blog/2026/04/01/mitigating-the-axios-npm-supply-chain-compromise/).
 
 ### Sinks
 

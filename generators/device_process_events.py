@@ -8,7 +8,7 @@ from generators.base import register
 from generators.common import now_utc
 from generators.device_common import (
     envelope,
-    hashes_for,
+    hashes_for_process,
     initiating_process_fields,
     pick_device,
     pick_process,
@@ -37,7 +37,7 @@ def generate(world: World) -> DeviceProcessEvents:
     )
 
     proc = pick_process(world)
-    md5, sha1, sha256 = hashes_for(proc.file_name)
+    md5, sha1, sha256 = hashes_for_process(proc)
     pid = random.randint(500, 30000)
     creation_time = now_utc() - timedelta(seconds=random.randint(0, 30))
 

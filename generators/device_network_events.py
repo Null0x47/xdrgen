@@ -25,22 +25,6 @@ _ACTION_TYPES = [
 ]
 _ACTION_VALUES, _ACTION_WEIGHTS = zip(*_ACTION_TYPES)
 
-# (port, host) pairs — host is None when the port is unrelated to a URL.
-_REMOTE_DESTS = [
-    (443, "graph.microsoft.com"),
-    (443, "outlook.office365.com"),
-    (443, "login.microsoftonline.com"),
-    (443, "github.com"),
-    (443, "api.github.com"),
-    (443, "windowsupdate.microsoft.com"),
-    (53, None),  # DNS
-    (445, None),  # SMB
-    (88, None),  # Kerberos
-    (389, None),  # LDAP
-    (3389, None),  # RDP
-    (80, "ctldl.windowsupdate.com"),
-]
-
 
 def _ip_type(ip: str) -> str:
     if ip.startswith(("10.", "192.168.", "172.16.", "172.17.")):
@@ -57,7 +41,8 @@ def generate(world: World) -> DeviceNetworkEvents:
     remote_ip_entry = random.choice(world.ips)
 
     action_type = random.choices(_ACTION_VALUES, weights=_ACTION_WEIGHTS, k=1)[0]
-    remote_port, remote_url = random.choice(_REMOTE_DESTS)
+    destination = random.choice(world.network_destinations)
+    remote_port, remote_url = destination.port, destination.url
     protocol = "Udp" if remote_port == 53 else "Tcp"
 
     local_ip = device.local_ip or f"10.10.20.{random.randint(2, 254)}"

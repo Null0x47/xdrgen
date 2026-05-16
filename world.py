@@ -39,7 +39,9 @@ class DomainController(BaseModel):
 
 
 class Process(BaseModel):
-    """One InitiatingProcess catalogue entry — hashes are derived at runtime."""
+    """One InitiatingProcess catalogue entry — hashes are derived from
+    `file_name` at runtime unless `md5` / `sha1` / `sha256` are pinned here
+    (used to seed published IOC hashes into the telemetry)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -57,6 +59,9 @@ class Process(BaseModel):
     signature_status: str = "Valid"
     signer_type: str = "OsVendor"
     parent: str = "explorer.exe"
+    md5: Optional[str] = None
+    sha1: Optional[str] = None
+    sha256: Optional[str] = None
 
 
 class Device(BaseModel):
@@ -144,6 +149,29 @@ class GraphApiEndpoint(BaseModel):
     uri: str
     workload: str
     scope: str
+
+
+class RegistryTarget(BaseModel):
+    """One DeviceRegistryEvents target — key + value tuple the generator picks."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    key: str
+    value_name: str
+    value_data: str
+    value_type: str  # REG_SZ | REG_DWORD | REG_BINARY | …
+
+
+class NetworkDestination(BaseModel):
+    """Outbound destination pool for DeviceNetworkEvents.
+
+    `url` is None for ports unrelated to a hostname (DNS, SMB, Kerberos, …)
+    so the field stays null in the emitted row, matching real MDE telemetry."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    port: int
+    url: Optional[str] = None
 
 
 class ConditionalAccessPolicy(BaseModel):
@@ -1335,6 +1363,78 @@ _DEFAULT_GRAPH_API_ENDPOINTS: tuple[GraphApiEndpoint, ...] = (
 )
 
 
+# Registry targets feeding DeviceRegistryEvents — Run / IFEO / policy keys
+# real hunters watch.
+_DEFAULT_REGISTRY_TARGETS: tuple[RegistryTarget, ...] = (
+    RegistryTarget(
+        key=r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
+        value_name="OneDrive",
+        value_data=r"C:\Users\Avery\AppData\Local\Microsoft\OneDrive\OneDrive.exe /background",
+        value_type="REG_SZ",
+    ),
+    RegistryTarget(
+        key=r"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run",
+        value_name="Teams",
+        value_data=r'"C:\Users\Avery\AppData\Local\Microsoft\Teams\Update.exe" --processStart "Teams.exe"',
+        value_type="REG_SZ",
+    ),
+    RegistryTarget(
+        key=r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\sethc.exe",
+        value_name="Debugger",
+        value_data=r"cmd.exe",
+        value_type="REG_SZ",
+    ),
+    RegistryTarget(
+        key=r"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WinDefend",
+        value_name="Start",
+        value_data="2",
+        value_type="REG_DWORD",
+    ),
+    RegistryTarget(
+        key=r"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender",
+        value_name="DisableAntiSpyware",
+        value_data="0",
+        value_type="REG_DWORD",
+    ),
+    RegistryTarget(
+        key=r"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa",
+        value_name="RunAsPPL",
+        value_data="1",
+        value_type="REG_DWORD",
+    ),
+    RegistryTarget(
+        key=r"HKEY_CURRENT_USER\Software\Microsoft\Office\16.0\Word\Security",
+        value_name="VBAWarnings",
+        value_data="2",
+        value_type="REG_DWORD",
+    ),
+    RegistryTarget(
+        key=r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{A4B3C5D6-7890-1234-5678-9ABCDEF01234}",
+        value_name="DisplayName",
+        value_data="Internal Helper Tool",
+        value_type="REG_SZ",
+    ),
+)
+
+
+# Outbound (port, url) pairs feeding DeviceNetworkEvents.{RemotePort,RemoteUrl}.
+# `url=None` is used for ports unrelated to a hostname.
+_DEFAULT_NETWORK_DESTINATIONS: tuple[NetworkDestination, ...] = (
+    NetworkDestination(port=443, url="graph.microsoft.com"),
+    NetworkDestination(port=443, url="outlook.office365.com"),
+    NetworkDestination(port=443, url="login.microsoftonline.com"),
+    NetworkDestination(port=443, url="github.com"),
+    NetworkDestination(port=443, url="api.github.com"),
+    NetworkDestination(port=443, url="windowsupdate.microsoft.com"),
+    NetworkDestination(port=53, url=None),
+    NetworkDestination(port=445, url=None),
+    NetworkDestination(port=88, url=None),
+    NetworkDestination(port=389, url=None),
+    NetworkDestination(port=3389, url=None),
+    NetworkDestination(port=80, url="ctldl.windowsupdate.com"),
+)
+
+
 # Azure regions graph.microsoft.com requests terminate in — feeds
 # GraphApiAuditEvents.Location.
 _DEFAULT_GRAPH_API_LOCATIONS: tuple[str, ...] = (
@@ -1389,6 +1489,8 @@ class World(BaseModel):
     groups: tuple[Group, ...] = _DEFAULT_GROUPS
     graph_api_endpoints: tuple[GraphApiEndpoint, ...] = _DEFAULT_GRAPH_API_ENDPOINTS
     graph_api_locations: tuple[str, ...] = _DEFAULT_GRAPH_API_LOCATIONS
+    network_destinations: tuple[NetworkDestination, ...] = _DEFAULT_NETWORK_DESTINATIONS
+    registry_targets: tuple[RegistryTarget, ...] = _DEFAULT_REGISTRY_TARGETS
     conditional_access_policies: tuple[ConditionalAccessPolicy, ...] = (
         _DEFAULT_CA_POLICIES
     )
@@ -1424,6 +1526,8 @@ class Overrides(BaseModel):
     groups: Optional[list[Group]] = None
     graph_api_endpoints: Optional[list[GraphApiEndpoint]] = None
     graph_api_locations: Optional[list[str]] = None
+    network_destinations: Optional[list[NetworkDestination]] = None
+    registry_targets: Optional[list[RegistryTarget]] = None
     conditional_access_policies: Optional[list[ConditionalAccessPolicy]] = None
     entra_sign_in_error_codes: Optional[list[WeightedErrorCode]] = None
     entra_spn_sign_in_error_codes: Optional[list[WeightedErrorCode]] = None

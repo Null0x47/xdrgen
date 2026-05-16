@@ -71,7 +71,7 @@ from generators.identity_events import generate as generate_identity
 from generators.identity_logon_events import generate as generate_logon
 from generators.identity_query_events import generate as generate_query
 from generators.url_click_events import generate as generate_url_click
-from world import World
+from world import NetworkDestination, RegistryTarget, World
 
 # Default-World snapshot for tests that don't exercise overrides.
 _DEFAULTS = None
@@ -1054,6 +1054,17 @@ def test_device_network_events_dns_uses_udp(_world):
             assert event.Protocol == "Udp"
 
 
+def test_device_network_events_honors_network_destinations_override():
+    """Custom (port, url) is picked exclusively when network_destinations is overridden."""
+    world = World(
+        network_destinations=(NetworkDestination(port=8000, url="sfrclak.com"),)
+    )
+    for _ in range(50):
+        event = generate_device_network(world)
+        assert event.RemotePort == 8000
+        assert event.RemoteUrl == "sfrclak.com"
+
+
 def test_device_image_load_events_round_trips_through_model(_world):
     event = generate_device_image_load(_world)
 
@@ -1066,6 +1077,61 @@ def test_device_registry_events_round_trips_through_model(_world):
 
     assert isinstance(event, DeviceRegistryEvents)
     DeviceRegistryEvents.model_validate_json(event.model_dump_json(by_alias=True))
+
+
+def test_device_process_events_honors_pinned_process_sha256():
+    """Pinned sha256 on a Process must surface as DeviceProcessEvents.SHA256."""
+    from world import Process
+
+    pinned = "ed8560c1ac7ceb6983ba995124d5917dc1a00288912387a6389296637d5f815c"
+    world = World(
+        processes=(
+            Process(
+                file_name="powershell.exe",
+                folder_path=r"C:\Windows\System32\WindowsPowerShell\v1.0",
+                company="Microsoft Corporation",
+                description="Windows PowerShell",
+                internal_file_name="POWERSHELL",
+                original_file_name="PowerShell.EXE.MUI",
+                product_name="Microsoft® Windows® Operating System",
+                product_version="10.0.19041.3636",
+                command_lines=(
+                    r"powershell.exe -w hidden -ep bypass -File %TEMP%\6202033.ps1",
+                ),
+                sha256=pinned,
+            ),
+        )
+    )
+    for _ in range(50):
+        event = generate_device_process(world)
+        assert event.SHA256 == pinned
+        assert event.InitiatingProcessSHA256 == pinned
+
+
+def test_device_registry_events_honors_registry_targets_override():
+    """Custom (key, value_name, value_data, value_type) is picked exclusively."""
+    world = World(
+        registry_targets=(
+            RegistryTarget(
+                key=r"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run",
+                value_name="MicrosoftUpdate",
+                value_data=r"powershell.exe -w hidden -ep bypass -File %TEMP%\6202033.ps1",
+                value_type="REG_SZ",
+            ),
+        )
+    )
+    for _ in range(50):
+        event = generate_device_registry(world)
+        assert (
+            event.RegistryKey
+            == r"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run"
+        )
+        assert event.RegistryValueName == "MicrosoftUpdate"
+        assert (
+            event.RegistryValueData
+            == r"powershell.exe -w hidden -ep bypass -File %TEMP%\6202033.ps1"
+        )
+        assert event.RegistryValueType == "REG_SZ"
 
 
 def test_device_events_round_trips_through_model(_world):

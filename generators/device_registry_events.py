@@ -24,58 +24,6 @@ _ACTION_TYPES = [
 ]
 _ACTION_VALUES, _ACTION_WEIGHTS = zip(*_ACTION_TYPES)
 
-# (key, value_name, value_data, value_type) — Run / IFEO / policy keys hunters watch.
-_REGISTRY_TARGETS = [
-    (
-        r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
-        "OneDrive",
-        r"C:\Users\Avery\AppData\Local\Microsoft\OneDrive\OneDrive.exe /background",
-        "REG_SZ",
-    ),
-    (
-        r"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run",
-        "Teams",
-        r'"C:\Users\Avery\AppData\Local\Microsoft\Teams\Update.exe" --processStart "Teams.exe"',
-        "REG_SZ",
-    ),
-    (
-        r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\sethc.exe",
-        "Debugger",
-        r"cmd.exe",
-        "REG_SZ",
-    ),
-    (
-        r"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WinDefend",
-        "Start",
-        "2",
-        "REG_DWORD",
-    ),
-    (
-        r"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender",
-        "DisableAntiSpyware",
-        "0",
-        "REG_DWORD",
-    ),
-    (
-        r"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa",
-        "RunAsPPL",
-        "1",
-        "REG_DWORD",
-    ),
-    (
-        r"HKEY_CURRENT_USER\Software\Microsoft\Office\16.0\Word\Security",
-        "VBAWarnings",
-        "2",
-        "REG_DWORD",
-    ),
-    (
-        r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{A4B3C5D6-7890-1234-5678-9ABCDEF01234}",
-        "DisplayName",
-        "Internal Helper Tool",
-        "REG_SZ",
-    ),
-]
-
 
 @register("DeviceRegistryEvents")
 def generate(world: World) -> DeviceRegistryEvents:
@@ -83,7 +31,13 @@ def generate(world: World) -> DeviceRegistryEvents:
     user = pick_user_for_device(world, device)
 
     action_type = random.choices(_ACTION_VALUES, weights=_ACTION_WEIGHTS, k=1)[0]
-    key, value_name, value_data, value_type = random.choice(_REGISTRY_TARGETS)
+    target = random.choice(world.registry_targets)
+    key, value_name, value_data, value_type = (
+        target.key,
+        target.value_name,
+        target.value_data,
+        target.value_type,
+    )
 
     has_previous = "Renamed" in action_type or "Set" in action_type
     previous_key = key if action_type == "RegistryKeyRenamed" else None

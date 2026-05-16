@@ -26,6 +26,13 @@ def hashes_for(file_name: str) -> tuple[str, str, str]:
     )
 
 
+def hashes_for_process(proc: Process) -> tuple[str, str, str]:
+    """Pinned proc.md5/sha1/sha256 win individually; missing ones fall back
+    to the file_name-derived value so cross-table pivots still agree."""
+    md5, sha1, sha256 = hashes_for(proc.file_name)
+    return (proc.md5 or md5, proc.sha1 or sha1, proc.sha256 or sha256)
+
+
 def pick_process(world: World) -> Process:
     return random.choice(world.processes)
 
@@ -61,7 +68,7 @@ def initiating_process_fields(
 ) -> dict:
     """Universal InitiatingProcess* columns plus optional per-table extras."""
     proc = pick_process(world)
-    md5, sha1, sha256 = hashes_for(proc.file_name)
+    md5, sha1, sha256 = hashes_for_process(proc)
     pid = random.randint(500, 30000)
     parent_pid = random.randint(500, 30000)
     creation_time = now_utc() - timedelta(seconds=random.randint(60, 60 * 60 * 24))
