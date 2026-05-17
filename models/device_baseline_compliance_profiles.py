@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceBaselineComplianceProfiles(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     ProfileId: Optional[str] = Field(None, description="Unique identifier for the profile")
     ProfileName: Optional[str] = Field(None, description="Display name of the profile")
     ProfileDescription: Optional[str] = Field(None, description="Optional description providing additional information related to the profile")

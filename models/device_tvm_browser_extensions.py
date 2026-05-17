@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceTvmBrowserExtensions(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     DeviceId: Optional[str] = Field(None, description="Unique identifier for the device in the service")
     BrowserName: Optional[str] = Field(None, description="Name of the web browser with the extension")
     ExtensionId: Optional[str] = Field(None, description="Unique identifier for the browser extension")

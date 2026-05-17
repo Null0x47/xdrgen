@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceBehaviorInfo(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     AccountObjectId: Optional[str] = Field(None, description="Unique identifier for the account in Azure AD.")
     AccountUpn: Optional[str] = Field(None, description="User principal name (UPN) of the account.")
     ActionType: Optional[str] = Field(None, description="Type of activity that triggered the event. Associated with specific MITRE ATT&CK techniques.")

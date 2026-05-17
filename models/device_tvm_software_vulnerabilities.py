@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceTvmSoftwareVulnerabilities(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     CveId: Optional[str] = Field(None, description="Unique identifier assigned to the security vulnerability under the Common Vulnerabilities and Exposures (CVE) system")
     CveTags: Optional[Any] = Field(None, description="Array of tags relevant to the CVE; example: ZeroDay, NoSecurityUpdate")
     DeviceId: Optional[str] = Field(None, description="Unique identifier for the device in the service")

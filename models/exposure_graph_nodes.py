@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 from typing import Optional
 
@@ -5,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class ExposureGraphNodes(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     NodeId: Optional[str] = Field(None, description="Unique node identifier")
     NodeLabel: Optional[str] = Field(None, description="Node label")
     NodeName: Optional[str] = Field(None, description="Node display name")

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceCalendar(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     Computer: Optional[str] = Field(None, description="")
     DelaySeconds: Optional[int] = Field(None, description="")
     DeviceType: Optional[str] = Field(None, description="")

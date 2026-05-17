@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class BehaviorEntities(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     AccountDomain: Optional[str] = Field(None, description="Domain of the account.")
     AccountName: Optional[str] = Field(None, description="User name of the account.")
     AccountObjectId: Optional[str] = Field(None, description="Unique identifier for the account in Azure AD.")

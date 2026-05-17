@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class FileMaliciousContentInfo(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     DetectionMethods: Optional[str] = Field(None, description="Verdict from the email filtering stack on whether the email contains malware, phishing, or other threats.")
     DocumentID: Optional[str] = Field(None, description="Unique identifier of the file.")
     FileCreationTime: Optional[datetime] = Field(None, description="Timestamp of the file creation.")

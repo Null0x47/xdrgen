@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 from typing import Optional
 
@@ -5,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class ExposureGraphEdges(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     EdgeId: Optional[str] = Field(None, description="Unique identifier for the relationship/edge")
     EdgeLabel: Optional[str] = Field(None, description="The edge label like \"routes traffic to\"")
     SourceNodeId: Optional[str] = Field(None, description="Node ID of the edge's source")
