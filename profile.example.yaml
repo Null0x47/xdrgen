@@ -6,6 +6,37 @@
 # Top-level keys (both optional):
 #   tables:    tables to emit. Omit/empty = every registered generator.
 #   overrides: per-tenant fixtures. Lists fully replace defaults (no merge).
+#
+# Every pool override supports two shapes:
+#
+#   1. Bare list — sample uniformly (the default; any per-entry `weight` is ignored):
+#
+#        devices:
+#          - device_id: ws01
+#            device_name: WS-01
+#          - device_id: ws02
+#            device_name: WS-02
+#
+#   2. `{random: false, entries: [...]}` — sample weighted. Every entry MUST
+#      declare `weight` (validator fails fast otherwise):
+#
+#        devices:
+#          random: false
+#          entries:
+#            - device_id: ws01
+#              device_name: WS-01
+#              weight: 10
+#            - device_id: ws02
+#              device_name: WS-02
+#              weight: 1
+#
+#   Scalar pools (e.g. `cloud_app_file_names`) accept the same two shapes —
+#   either a bare string list, or `{random: false, entries: [{value, weight}, ...]}`.
+#
+#   Caveat: pools sampled with `random.sample` (k>1) — currently
+#   `local_dns_servers` and a couple of DeviceNetworkInfo sites — still pick
+#   uniformly even when `random: false` (the validator still enforces weights
+#   are present, but they're ignored for k>1 sampling).
 
 tables:
   # Cloud apps & sign-ins
@@ -67,6 +98,19 @@ overrides:
   # device_name. `primary_user_upn` should match a users[].upn — that user
   # then biases the InitiatingProcess account ~75% of the time. Omit for
   # shared boxes (file servers, build runners).
+  #
+  # The bare list below samples uniformly. To weight one device heavily over
+  # another (e.g. simulate a noisy executive laptop), switch to:
+  #
+  #   devices:
+  #     random: false
+  #     entries:
+  #       - device_id: 7c2bd31c-2102-4ce7-93a0-2cf5e19b5a7d
+  #         device_name: WIN-AVERY-01.northwind.com
+  #         weight: 10
+  #       - device_id: 9e4df53e-4324-4e09-b5c2-4e17f3bd7c9f
+  #         device_name: WIN-SAM-PAW.northwind.com
+  #         weight: 1
   devices:
     - device_id: 7c2bd31c-2102-4ce7-93a0-2cf5e19b5a7d
       device_name: WIN-AVERY-01.northwind.com
@@ -548,6 +592,14 @@ overrides:
         - repo.create
 
   # Object-name pools CloudAppEvents draws from depending on action shape.
+  # Bare string lists are uniformly sampled. To weight them, switch to the
+  # `{random: false, entries: [...]}` shape with `{value, weight}` per entry:
+  #
+  #   cloud_app_file_names:
+  #     random: false
+  #     entries:
+  #       - {value: salary-bands.xlsx, weight: 10}
+  #       - {value: Q3_forecast.xlsx,  weight: 1}
   cloud_app_file_names:
     - Q3_forecast.xlsx
     - design-spec.docx

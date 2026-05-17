@@ -8,7 +8,7 @@ import uuid
 
 from models import GraphApiAuditEvents
 from generators.base import register
-from generators.common import now_utc
+from generators.common import now_utc, pick
 from world import World
 
 _PINNED_VERSION_RE = re.compile(r"^/(v1\.0|beta)/")
@@ -16,9 +16,9 @@ _PINNED_VERSION_RE = re.compile(r"^/(v1\.0|beta)/")
 
 @register("GraphApiAuditEvents")
 def generate(world: World) -> GraphApiAuditEvents:
-    user = random.choice(world.users)
-    ip = random.choice(world.ips)
-    endpoint = random.choice(world.graph_api_endpoints)
+    user = pick(world.users)
+    ip = pick(world.ips)
+    endpoint = pick(world.graph_api_endpoints)
     timestamp = now_utc()
 
     # ~60% delegated for humans; service accounts always app-only.
@@ -26,18 +26,18 @@ def generate(world: World) -> GraphApiAuditEvents:
     if delegated:
         entity_type = "User"
         account_object_id = user.object_id
-        client = random.choice(world.client_apps)
+        client = pick(world.client_apps)
         application_id = client.app_id
         service_principal_id = client.app_id
     else:
         entity_type = "ServicePrincipal"
         account_object_id = None
-        client = random.choice(world.client_apps)
+        client = pick(world.client_apps)
         application_id = client.app_id
         service_principal_id = client.app_id
 
-    group = random.choice(world.groups)
-    device = random.choice(world.devices)
+    group = pick(world.groups)
+    device = pick(world.devices)
     # Pin ApiVersion if the URI hard-codes one; else randomise.
     pinned = _PINNED_VERSION_RE.match(endpoint.uri)
     api_version = pinned.group(1) if pinned else random.choice(("v1.0", "beta"))
@@ -55,11 +55,7 @@ def generate(world: World) -> GraphApiAuditEvents:
     )
     request_uri = f"https://graph.microsoft.com{uri_path}"
 
-    status_code = random.choices(
-        [s.code for s in world.graph_api_status_codes],
-        weights=[s.weight for s in world.graph_api_status_codes],
-        k=1,
-    )[0]
+    status_code = pick(world.graph_api_status_codes).code
     is_success = status_code.startswith("2")
 
     # GETs return larger payloads than writes; 204 = 0; failures = short envelopes.
@@ -82,7 +78,7 @@ def generate(world: World) -> GraphApiAuditEvents:
         RequestUri=request_uri,
         AccountObjectId=account_object_id,
         OperationId=str(uuid.uuid4()),
-        Location=random.choice(world.graph_api_locations),
+        Location=pick(world.graph_api_locations).value,
         RequestDuration=str(random.randint(20, 1500)),
         RequestId=str(uuid.uuid4()),
         RequestMethod=endpoint.method,

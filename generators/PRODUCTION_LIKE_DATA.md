@@ -4,6 +4,15 @@ The generators are hand-curated per table to produce realistic, *correlated* val
 
 Generators self-register via a `@register("TableName")` decorator on their `generate(world)` function; [`__init__.py`](./__init__.py) walks the package with `pkgutil.iter_modules` at import time, so adding a new generator is a one-file change — drop a module under `generators/`, decorate, done.
 
+### Sampling: uniform by default, weighted on opt-in
+
+Every pool field listed below as profile-overridable accepts two YAML shapes:
+
+- A bare list of entries — sampled uniformly. Any `weight` value is ignored.
+- `{random: false, entries: [...]}` — sampled weighted. Every entry must declare `weight`; the profile loader fails fast if any is missing. Scalar pools (plain string lists like `cloud_app_file_names`, `local_dns_servers`) switch their entries to `{value, weight}` objects in this mode.
+
+The exception is the two pools sampled via `random.sample(k=2)` — `local_dns_servers` and the DNS-server slot of `DeviceNetworkInfo`. They still pick uniformly even when `random: false` (no stdlib weighted-sample-without-replacement); the validator still enforces weights are present.
+
 ## Per-table specifics
 
 ### `CloudAppEvents`

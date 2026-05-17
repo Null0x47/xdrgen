@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 
 from generators.base import register
+from generators.common import pick
 from generators.device_common import (
     envelope,
     initiating_process_fields,
@@ -18,16 +19,12 @@ from world import World
 def generate(world: World) -> DeviceLogonEvents:
     device = pick_device(world)
     user = pick_user_for_device(world, device)
-    ip = random.choice(world.ips)
+    ip = pick(world.ips)
 
     success = random.random() < 0.92
     action_type = "LogonSuccess" if success else "LogonFailed"
-    logon_type = random.choices(
-        [t.logon_type for t in world.device_logon_types],
-        weights=[t.weight for t in world.device_logon_types],
-        k=1,
-    )[0]
-    protocol = random.choice(world.device_logon_protocols)
+    logon_type = pick(world.device_logon_types).logon_type
+    protocol = pick(world.device_logon_protocols).value
     logon_id = random.randint(100_000, 9_999_999)
 
     # Local logons leave RemoteIP/Port null.
@@ -51,7 +48,7 @@ def generate(world: World) -> DeviceLogonEvents:
         AdditionalFields=None,
         AppGuardContainerId=None,
         FailureReason=(
-            random.choice(world.device_logon_failure_reasons) if not success else None
+            pick(world.device_logon_failure_reasons).value if not success else None
         ),
         IsLocalAdmin=user.type == "Admin",
         LogonId=logon_id,

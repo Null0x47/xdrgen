@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 
 from generators.base import register
+from generators.common import pick
 from generators.device_common import (
     envelope,
     initiating_process_fields,
@@ -25,14 +26,10 @@ def _ip_type(ip: str) -> str:
 def generate(world: World) -> DeviceNetworkEvents:
     device = pick_device(world)
     user = pick_user_for_device(world, device)
-    remote_ip_entry = random.choice(world.ips)
+    remote_ip_entry = pick(world.ips)
 
-    action_type = random.choices(
-        [a.action for a in world.device_network_action_types],
-        weights=[a.weight for a in world.device_network_action_types],
-        k=1,
-    )[0]
-    destination = random.choice(world.network_destinations)
+    action_type = pick(world.device_network_action_types).action
+    destination = pick(world.network_destinations)
     remote_port, remote_url = destination.port, destination.url
     protocol = "Udp" if remote_port == 53 else "Tcp"
 

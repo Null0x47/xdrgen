@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 
 from generators.base import register
+from generators.common import pick
 from generators.device_common import (
     envelope,
     initiating_process_fields,
@@ -18,12 +19,8 @@ def generate(world: World) -> DeviceRegistryEvents:
     device = pick_device(world)
     user = pick_user_for_device(world, device)
 
-    action_type = random.choices(
-        [a.action for a in world.device_registry_action_types],
-        weights=[a.weight for a in world.device_registry_action_types],
-        k=1,
-    )[0]
-    target = random.choice(world.registry_targets)
+    action_type = pick(world.device_registry_action_types).action
+    target = pick(world.registry_targets)
     key, value_name, value_data, value_type = (
         target.key,
         target.value_name,

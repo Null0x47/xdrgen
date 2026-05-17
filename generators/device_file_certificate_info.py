@@ -4,7 +4,7 @@ import random
 from datetime import timedelta
 
 from generators.base import register
-from generators.common import now_utc
+from generators.common import now_utc, pick
 from generators.device_common import envelope, hashes_for, pick_device
 from models import DeviceFileCertificateInfo
 from world import World
@@ -13,8 +13,8 @@ from world import World
 @register("DeviceFileCertificateInfo")
 def generate(world: World) -> DeviceFileCertificateInfo:
     device = pick_device(world)
-    cert = random.choice(world.code_signing_certificates)
-    file_name = random.choice(world.signed_files)
+    cert = pick(world.code_signing_certificates)
+    file_name = pick(world.signed_files).value
     _, sha1, _ = hashes_for(file_name)
 
     # ~95% signed.
@@ -32,7 +32,9 @@ def generate(world: World) -> DeviceFileCertificateInfo:
         CertificateExpirationTime=expiration_time if is_signed else None,
         CertificateSerialNumber=cert.serial if is_signed else None,
         CrlDistributionPointUrls=(
-            random.choice(world.crl_urls) if is_signed and world.crl_urls else None
+            pick(world.crl_urls).value
+            if is_signed and len(world.crl_urls) > 0
+            else None
         ),
         IsRootSignerMicrosoft=cert.is_root_microsoft if is_signed else None,
         IsSigned=is_signed,

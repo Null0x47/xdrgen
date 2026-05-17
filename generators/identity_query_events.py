@@ -4,25 +4,25 @@ import random
 
 from models import IdentityQueryEvents
 from generators.base import register
-from generators.common import now_utc
+from generators.common import now_utc, pick
 from world import World
 
 
 def _query_target_for_kind(query_type: str, world: World) -> str:
     if "Group" in query_type:
-        return random.choice(world.identity_query_group_targets)
+        return pick(world.identity_query_group_targets).value
     if "Computer" in query_type:
-        return random.choice(world.identity_query_computer_targets)
+        return pick(world.identity_query_computer_targets).value
     if query_type == "QueryDomain":
         return world.on_prem_ad_domain
     if query_type == "Resolve":
         return (
-            random.choice(world.identity_query_computer_targets)
+            pick(world.identity_query_computer_targets).value
             + f".{world.on_prem_ad_domain}"
         )
     candidates = [u for u in world.users if u.sam_account_name]
-    pick = random.choice(candidates) if candidates else random.choice(world.users)
-    return pick.sam_account_name or pick.upn
+    picked = random.choice(candidates) if candidates else pick(world.users)
+    return picked.sam_account_name or picked.upn
 
 
 def _ldap_query_string(query_type: str, target: str) -> str:
@@ -45,16 +45,12 @@ def _ldap_query_string(query_type: str, target: str) -> str:
 
 @register("IdentityQueryEvents")
 def generate(world: World) -> IdentityQueryEvents:
-    user = random.choice(world.users)
-    ip = random.choice(world.ips)
-    dc = random.choice(world.domain_controllers)
+    user = pick(world.users)
+    ip = pick(world.ips)
+    dc = pick(world.domain_controllers)
     timestamp = now_utc()
 
-    kind = random.choices(
-        world.identity_query_kinds,
-        weights=[k.weight for k in world.identity_query_kinds],
-        k=1,
-    )[0]
+    kind = pick(world.identity_query_kinds)
     query_type = kind.query_type
     protocol = kind.protocol
     destination_port = kind.port
@@ -65,7 +61,7 @@ def generate(world: World) -> IdentityQueryEvents:
     if query_type in ("QueryUser", "EnumerateUsers"):
         target_user = next(
             (u for u in world.users if u.sam_account_name == target),
-            random.choice(world.users),
+            pick(world.users),
         )
         target_account_display = target_user.display_name
         target_account_upn = target_user.upn

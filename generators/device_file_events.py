@@ -4,6 +4,7 @@ import random
 from typing import Optional
 
 from generators.base import register
+from generators.common import pick, pick_filtered
 from generators.device_common import (
     envelope,
     hashes_for,
@@ -42,23 +43,14 @@ def generate(world: World) -> DeviceFileEvents:
     device = pick_device(world)
     user = pick_user_for_device(world, device)
 
-    actions = world.file_action_types
-    action_type = random.choices(
-        [a.action for a in actions],
-        weights=[a.weight for a in actions],
-        k=1,
-    )[0]
+    action_type = pick(world.file_action_types).action
 
     # NetworkShare* actions must land on a UNC path.
     is_share_action = action_type.startswith("NetworkShare")
-    templates = world.file_templates
     if is_share_action:
-        candidates = [t for t in templates if t.kind == "share"]
-        if not candidates:
-            candidates = list(templates)
+        template = pick_filtered(world.file_templates, lambda t: t.kind == "share")
     else:
-        candidates = list(templates)
-    template = random.choice(candidates)
+        template = pick(world.file_templates)
     folder_template, file_name, kind = (
         template.folder_template,
         template.file_name,
@@ -76,11 +68,11 @@ def generate(world: World) -> DeviceFileEvents:
     if (
         kind == "download"
         and action_type == "FileCreated"
-        and world.file_download_hosts
+        and len(world.file_download_hosts) > 0
     ):
-        host = random.choice(world.file_download_hosts)
+        host = pick(world.file_download_hosts).value
         file_origin_url = f"https://{host}/share/{file_name}"
-        file_origin_ip = random.choice(world.ips).ip
+        file_origin_ip = pick(world.ips).ip
         file_origin_referrer = f"https://{host}/"
 
     previous_file_name = previous_folder_path = None
@@ -94,8 +86,12 @@ def generate(world: World) -> DeviceFileEvents:
         sensitivity_label, sensitivity_sublabel = "Highly Confidential", "HR"
     elif share_name and "Finance" in folder_path:
         sensitivity_label, sensitivity_sublabel = "Highly Confidential", "Finance"
-    elif kind == "doc" and world.file_sensitivity_labels and random.random() < 0.15:
-        picked = random.choice(world.file_sensitivity_labels)
+    elif (
+        kind == "doc"
+        and len(world.file_sensitivity_labels) > 0
+        and random.random() < 0.15
+    ):
+        picked = pick(world.file_sensitivity_labels)
         sensitivity_label, sensitivity_sublabel = picked.label, picked.sublabel
 
     is_aip = bool(sensitivity_label and "Confidential" in sensitivity_label)

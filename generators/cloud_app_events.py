@@ -5,7 +5,7 @@ import uuid
 
 from models import CloudAppEvents
 from generators.base import register
-from generators.common import now_utc
+from generators.common import now_utc, pick
 from world import User, World
 
 
@@ -26,7 +26,7 @@ def _activity_objects(
         )
     ):
         object_type = "File"
-        object_name = random.choice(world.cloud_app_file_names)
+        object_name = pick(world.cloud_app_file_names).value
         object_id = str(uuid.uuid4())
         return (
             object_type,
@@ -38,7 +38,7 @@ def _activity_objects(
         k in a for k in ("mail", "send", "delete", "move", "inboxrule", "set-mailbox")
     ):
         object_type = "Email"
-        object_name = random.choice(world.cloud_app_mail_subjects)
+        object_name = pick(world.cloud_app_mail_subjects).value
         object_id = f"<{uuid.uuid4()}@{world.tenant_domain}>"
         return (
             object_type,
@@ -56,7 +56,7 @@ def _activity_objects(
         )
     if any(k in a for k in ("member", "team", "channel", "collaboration_invite")):
         object_type = "Group"
-        object_name = random.choice(world.cloud_app_group_names)
+        object_name = pick(world.cloud_app_group_names).value
         object_id = str(uuid.uuid4())
         return (
             object_type,
@@ -77,10 +77,10 @@ def _activity_objects(
 
 @register("CloudAppEvents")
 def generate(world: World) -> CloudAppEvents:
-    user = random.choice(world.users)
-    app = random.choice(world.cloud_apps)
-    ip = random.choice(world.ips)
-    ua = random.choice(world.user_agents)
+    user = pick(world.users)
+    app = pick(world.cloud_apps)
+    ip = pick(world.ips)
+    ua = pick(world.user_agents)
     action = random.choice(app.actions)
     timestamp = now_utc()
 

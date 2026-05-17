@@ -8,7 +8,7 @@ import uuid
 from datetime import timedelta
 from typing import Optional
 
-from generators.common import now_utc
+from generators.common import now_utc, pick
 from world import Device, Process, User, World
 
 
@@ -34,11 +34,11 @@ def hashes_for_process(proc: Process) -> tuple[str, str, str]:
 
 
 def pick_process(world: World) -> Process:
-    return random.choice(world.processes)
+    return pick(world.processes)
 
 
 def pick_device(world: World) -> Device:
-    return random.choice(world.devices)
+    return pick(world.devices)
 
 
 def pick_user_for_device(world: World, device: Device) -> User:
@@ -49,7 +49,7 @@ def pick_user_for_device(world: World, device: Device) -> User:
         )
         if primary is not None and random.random() < 0.75:
             return primary
-    return random.choice(world.users)
+    return pick(world.users)
 
 
 def sid_for(world: World, user: User) -> Optional[str]:

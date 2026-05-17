@@ -4,7 +4,7 @@ import random
 
 from models import EmailPostDeliveryEvents
 from generators.base import register
-from generators.common import now_utc
+from generators.common import now_utc, pick, pick_filtered
 from generators.email_pool import pool_for
 from world import World
 
@@ -15,12 +15,12 @@ def generate(world: World) -> EmailPostDeliveryEvents:
 
     # Phishing verdicts → ZAP / admin paths; otherwise any path.
     if email["threat_types"]:
-        candidates = [
-            p for p in world.email_post_delivery_paths if p.trigger in ("ZAP", "Admin")
-        ] or list(world.email_post_delivery_paths)
+        path = pick_filtered(
+            world.email_post_delivery_paths,
+            lambda p: p.trigger in ("ZAP", "Admin"),
+        )
     else:
-        candidates = list(world.email_post_delivery_paths)
-    path = random.choice(candidates)
+        path = pick(world.email_post_delivery_paths)
 
     recipient = email["recipient"]
     timestamp = now_utc()

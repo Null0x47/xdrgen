@@ -6,7 +6,7 @@ from datetime import timedelta
 
 from models import IdentityAccountInfo
 from generators.base import register
-from generators.common import now_utc
+from generators.common import now_utc, pick
 from world import World
 
 
@@ -21,17 +21,13 @@ def _source_providers(world: World) -> list[tuple[str, str, str]]:
 
 @register("IdentityAccountInfo")
 def generate(world: World) -> IdentityAccountInfo:
-    user = random.choice(world.users)
+    user = pick(world.users)
     provider, provider_instance_id, provider_display = random.choice(
         _source_providers(world)
     )
     timestamp = now_utc()
 
-    risk_level = random.choices(
-        [r.level for r in world.identity_risk_levels],
-        weights=[r.weight for r in world.identity_risk_levels],
-        k=1,
-    )[0]
+    risk_level = pick(world.identity_risk_levels).level
     is_admin = user.type == "Admin"
     is_service = user.type == "Application"
     is_guest = "#EXT#" in user.upn
@@ -117,7 +113,7 @@ def generate(world: World) -> IdentityAccountInfo:
         SourceProvider=provider,
         SourceProviderInstanceId=provider_instance_id,
         SourceProviderInstanceDisplayName=provider_display,
-        AuthenticationMethod=random.choice(world.identity_auth_methods),
+        AuthenticationMethod=pick(world.identity_auth_methods).value,
         AuthenticationSourceAcccountId=None,
         EnrolledMfas=enrolled_mfas,
         LastPasswordChangeTime=last_pwd_change,

@@ -4,7 +4,7 @@ import random
 from datetime import timedelta
 
 from generators.base import register
-from generators.common import now_utc
+from generators.common import now_utc, pick
 from generators.device_common import (
     envelope,
     hashes_for,
@@ -22,11 +22,7 @@ def generate(world: World) -> DeviceEvents:
     device = pick_device(world)
     user = pick_user_for_device(world, device)
 
-    picked = random.choices(
-        world.device_event_actions,
-        weights=[a.weight for a in world.device_event_actions],
-        k=1,
-    )[0]
+    picked = pick(world.device_event_actions)
     action_type, shape = picked.action, picked.shape
     initiator_logon_id = random.randint(100_000, 9_999_999)
     initiator_fields = initiating_process_fields(
@@ -45,7 +41,7 @@ def generate(world: World) -> DeviceEvents:
         file_size = random.randint(20_000, 5_000_000)
         md5, sha1, sha256 = hashes_for(file_name)
         file_origin_url = "https://acme-files.example.com/share/" + file_name
-        file_origin_ip = random.choice(world.ips).ip
+        file_origin_ip = pick(world.ips).ip
 
     proc_command_line = proc_creation_time = proc_id = proc_token = None
     is_proc_remote = None
@@ -66,7 +62,7 @@ def generate(world: World) -> DeviceEvents:
     if shape == "network":
         local_ip = device.local_ip or f"10.10.20.{random.randint(2, 254)}"
         local_port = random.randint(49152, 65535)
-        remote_ip_entry = random.choice(world.ips)
+        remote_ip_entry = pick(world.ips)
         remote_ip = remote_ip_entry.ip
         remote_port = 443
         remote_url = random.choice(

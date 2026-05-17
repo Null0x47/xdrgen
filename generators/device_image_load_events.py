@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 
 from generators.base import register
+from generators.common import pick
 from generators.device_common import (
     envelope,
     hashes_for,
@@ -19,7 +20,7 @@ def generate(world: World) -> DeviceImageLoadEvents:
     device = pick_device(world)
     user = pick_user_for_device(world, device)
 
-    library = random.choice(world.loaded_libraries)
+    library = pick(world.loaded_libraries)
     file_name, folder_path = library.file_name, library.folder_path
     md5, sha1, sha256 = hashes_for(file_name)
 

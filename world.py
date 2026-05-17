@@ -2,9 +2,134 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Generic, Optional, TypeVar, Union, get_args, get_origin
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
+
+T = TypeVar("T")
+
+
+class ScalarEntry(BaseModel):
+    """Wrapper for plain-string pool entries.
+
+    `value` carries the string; `weight` is required only when the
+    enclosing `WeightedPool` is opted into weighted mode with `random=false`.
+    YAML string lists are auto-coerced to `{value: <str>}` for these pools."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    value: str
+    weight: Optional[int] = None
+
+
+class WeightedPool(BaseModel, Generic[T]):
+    """Pool of pickable entries with an explicit sampling mode.
+
+    `random=True` (default): generators sample uniformly; any per-entry
+    `weight` is ignored. `random=False`: every entry must declare `weight`
+    and generators sample weighted. Yaml profiles can omit the wrapper
+    entirely and pass a bare list — that is auto-wrapped with `random=True`."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    random: bool = True
+    entries: tuple[T, ...]
+
+    @model_validator(mode="after")
+    def _check_weights(self) -> "WeightedPool[T]":
+        if self.random:
+            return self
+        missing = [
+            i for i, e in enumerate(self.entries) if getattr(e, "weight", None) is None
+        ]
+        if missing:
+            raise ValueError(
+                "random=false requires `weight` on every entry; "
+                f"missing at index/indices {missing}"
+            )
+        return self
+
+    def __iter__(self):
+        return iter(self.entries)
+
+    def __len__(self) -> int:
+        return len(self.entries)
+
+    def __getitem__(self, i):
+        return self.entries[i]
+
+    def __contains__(self, item) -> bool:
+        return item in self.entries
+
+
+def _pool_target(annotation: Any) -> Optional[Any]:
+    """If `annotation` is a (possibly Optional/Union) `WeightedPool[X]`, return it."""
+    if isinstance(annotation, type) and issubclass(annotation, WeightedPool):
+        return annotation
+    if get_origin(annotation) is Union:
+        for arg in get_args(annotation):
+            sub = _pool_target(arg)
+            if sub is not None:
+                return sub
+    return None
+
+
+def _is_scalar_pool(target: Any) -> bool:
+    meta = getattr(target, "__pydantic_generic_metadata__", None)
+    if not meta:
+        return False
+    args = meta.get("args") or ()
+    return bool(args) and isinstance(args[0], type) and issubclass(args[0], ScalarEntry)
+
+
+def _coerce_entry(entry: Any, scalar: bool) -> Any:
+    if scalar and isinstance(entry, str):
+        return {"value": entry}
+    return entry
+
+
+def _wrap_pool_input(value: Any, target: Any) -> Any:
+    """Normalize a pool override value into a `{random, entries}` dict."""
+    if value is None or isinstance(value, WeightedPool):
+        return value
+    scalar = _is_scalar_pool(target)
+    if isinstance(value, (list, tuple)):
+        return {"random": True, "entries": [_coerce_entry(e, scalar) for e in value]}
+    if isinstance(value, dict) and "entries" in value:
+        out = dict(value)
+        out["entries"] = [_coerce_entry(e, scalar) for e in out.get("entries", [])]
+        return out
+    return value
+
+
+def _auto_wrap_pools(cls: type, data: Any) -> Any:
+    """Model-validator (mode=before) shared by World and Overrides.
+
+    Accepts bare lists/tuples for pool fields and wraps them as
+    `WeightedPool(random=True, entries=…)`. Also coerces bare strings
+    to `{value: <str>}` for scalar-wrapper pools."""
+    if not isinstance(data, dict):
+        return data
+    for name, info in cls.model_fields.items():
+        target = _pool_target(info.annotation)
+        if target is None:
+            continue
+        if name not in data:
+            continue
+        data[name] = _wrap_pool_input(data[name], target)
+    return data
+
+
+def _pool(items: tuple, random: bool = True) -> WeightedPool:
+    """Helper to wrap a default tuple into a uniform WeightedPool."""
+    return WeightedPool(random=random, entries=items)
+
+
+def _scalar_pool(values: tuple[str, ...]) -> WeightedPool[ScalarEntry]:
+    """Wrap a default `tuple[str, ...]` into a WeightedPool[ScalarEntry]."""
+    return WeightedPool(
+        random=True, entries=tuple(ScalarEntry(value=v) for v in values)
+    )
 
 
 class User(BaseModel):
@@ -28,6 +153,7 @@ class User(BaseModel):
     employee_id: Optional[str] = None
     city: Optional[str] = None
     country: Optional[str] = None
+    weight: Optional[int] = None
 
 
 class DomainController(BaseModel):
@@ -36,6 +162,7 @@ class DomainController(BaseModel):
     name: str
     ip: str
     device_id: str
+    weight: Optional[int] = None
 
 
 class Process(BaseModel):
@@ -62,6 +189,7 @@ class Process(BaseModel):
     md5: Optional[str] = None
     sha1: Optional[str] = None
     sha256: Optional[str] = None
+    weight: Optional[int] = None
 
 
 class Device(BaseModel):
@@ -78,6 +206,7 @@ class Device(BaseModel):
     mac_address: Optional[str] = None
     machine_group: Optional[str] = None
     primary_user_upn: Optional[str] = None
+    weight: Optional[int] = None
 
 
 class IPEntry(BaseModel):
@@ -93,6 +222,7 @@ class IPEntry(BaseModel):
     category: str  # Cloud provider | Corporate | ISP
     latitude: str
     longitude: str
+    weight: Optional[int] = None
 
 
 class UserAgentEntry(BaseModel):
@@ -102,6 +232,7 @@ class UserAgentEntry(BaseModel):
     platform: str
     device_type: str  # Workstation | Mobile
     browser: str
+    weight: Optional[int] = None
 
 
 class Resource(BaseModel):
@@ -109,6 +240,7 @@ class Resource(BaseModel):
 
     name: str
     id: str
+    weight: Optional[int] = None
 
 
 class ClientApp(BaseModel):
@@ -116,6 +248,7 @@ class ClientApp(BaseModel):
 
     name: str
     app_id: str
+    weight: Optional[int] = None
 
 
 class ServicePrincipal(BaseModel):
@@ -128,6 +261,7 @@ class ServicePrincipal(BaseModel):
     id: str
     app_id: str
     is_managed_identity: bool = False
+    weight: Optional[int] = None
 
 
 class Group(BaseModel):
@@ -137,6 +271,7 @@ class Group(BaseModel):
 
     name: str
     id: str
+    weight: Optional[int] = None
 
 
 class GraphApiEndpoint(BaseModel):
@@ -149,6 +284,7 @@ class GraphApiEndpoint(BaseModel):
     uri: str
     workload: str
     scope: str
+    weight: Optional[int] = None
 
 
 class RegistryTarget(BaseModel):
@@ -160,6 +296,7 @@ class RegistryTarget(BaseModel):
     value_name: str
     value_data: str
     value_type: str  # REG_SZ | REG_DWORD | REG_BINARY | …
+    weight: Optional[int] = None
 
 
 class CloudApp(BaseModel):
@@ -175,6 +312,7 @@ class CloudApp(BaseModel):
     instance_id: int
     audit_source: str
     actions: tuple[str, ...]
+    weight: Optional[int] = None
 
 
 class DeviceNetworkActionType(BaseModel):
@@ -183,7 +321,7 @@ class DeviceNetworkActionType(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     action: str
-    weight: int = 1
+    weight: Optional[int] = None
 
 
 class NetworkAdapter(BaseModel):
@@ -197,6 +335,7 @@ class NetworkAdapter(BaseModel):
     tunnel: Optional[str] = None  # Ssh | Ipsec | None
     network_category: str  # Private | Public | Domain
     network_name: str
+    weight: Optional[int] = None
 
 
 class DeviceRegistryActionType(BaseModel):
@@ -205,7 +344,7 @@ class DeviceRegistryActionType(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     action: str
-    weight: int = 1
+    weight: Optional[int] = None
 
 
 class EmailPostDeliveryPath(BaseModel):
@@ -221,6 +360,7 @@ class EmailPostDeliveryPath(BaseModel):
     trigger: str  # ZAP | Admin | User
     result: str
     delivery_location: str
+    weight: Optional[int] = None
 
 
 class GraphApiStatusCode(BaseModel):
@@ -229,7 +369,7 @@ class GraphApiStatusCode(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     code: str
-    weight: int = 1
+    weight: Optional[int] = None
 
 
 class IdentityRiskLevel(BaseModel):
@@ -238,7 +378,7 @@ class IdentityRiskLevel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     level: int
-    weight: int = 1
+    weight: Optional[int] = None
 
 
 class IdentityDirectoryActionType(BaseModel):
@@ -247,7 +387,7 @@ class IdentityDirectoryActionType(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     action: str
-    weight: int = 1
+    weight: Optional[int] = None
 
 
 class IdentityRawAction(BaseModel):
@@ -261,7 +401,7 @@ class IdentityRawAction(BaseModel):
     action: str
     application: str
     target_kind: str
-    weight: int = 1
+    weight: Optional[int] = None
 
 
 class IdentityLogonType(BaseModel):
@@ -270,7 +410,7 @@ class IdentityLogonType(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     logon_type: str
-    weight: int = 1
+    weight: Optional[int] = None
 
 
 class IdentityLogonProtocol(BaseModel):
@@ -283,7 +423,7 @@ class IdentityLogonProtocol(BaseModel):
 
     protocol: str
     port: int
-    weight: int = 1
+    weight: Optional[int] = None
 
 
 class IdentityQueryKind(BaseModel):
@@ -294,7 +434,7 @@ class IdentityQueryKind(BaseModel):
     query_type: str
     protocol: str  # Ldap | Samr | Dns
     port: int
-    weight: int = 1
+    weight: Optional[int] = None
 
 
 class UrlClickOutcome(BaseModel):
@@ -308,7 +448,7 @@ class UrlClickOutcome(BaseModel):
     action_type: str
     is_clicked_through: bool
     threat_types: Optional[str] = None
-    weight: int = 1
+    weight: Optional[int] = None
 
 
 class WeightedWorkload(BaseModel):
@@ -317,7 +457,7 @@ class WeightedWorkload(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     workload: str
-    weight: int = 1
+    weight: Optional[int] = None
 
 
 class DeviceLogonType(BaseModel):
@@ -330,7 +470,7 @@ class DeviceLogonType(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     logon_type: str
-    weight: int = 1
+    weight: Optional[int] = None
 
 
 class LoadedLibrary(BaseModel):
@@ -345,6 +485,7 @@ class LoadedLibrary(BaseModel):
 
     file_name: str
     folder_path: str
+    weight: Optional[int] = None
 
 
 class CodeSigningCertificate(BaseModel):
@@ -360,6 +501,7 @@ class CodeSigningCertificate(BaseModel):
     serial: str
     is_root_microsoft: bool = False
     signature_type: str = "Embedded"
+    weight: Optional[int] = None
 
 
 class DeviceEventAction(BaseModel):
@@ -374,7 +516,7 @@ class DeviceEventAction(BaseModel):
 
     action: str
     shape: str  # file | network | registry | none
-    weight: int = 1
+    weight: Optional[int] = None
 
 
 class FileTemplate(BaseModel):
@@ -390,6 +532,7 @@ class FileTemplate(BaseModel):
     folder_template: str
     file_name: str
     kind: str  # download | doc | temp | share
+    weight: Optional[int] = None
 
 
 class FileActionType(BaseModel):
@@ -401,7 +544,7 @@ class FileActionType(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     action: str
-    weight: int
+    weight: Optional[int] = None
 
 
 class SensitivityLabel(BaseModel):
@@ -415,6 +558,7 @@ class SensitivityLabel(BaseModel):
 
     label: str
     sublabel: Optional[str] = None
+    weight: Optional[int] = None
 
 
 class NetworkDestination(BaseModel):
@@ -427,6 +571,7 @@ class NetworkDestination(BaseModel):
 
     port: int
     url: Optional[str] = None
+    weight: Optional[int] = None
 
 
 class ConditionalAccessPolicy(BaseModel):
@@ -438,6 +583,7 @@ class ConditionalAccessPolicy(BaseModel):
     displayName: str
     enforcedGrantControls: tuple[str, ...] = ()
     enforcedSessionControls: tuple[str, ...] = ()
+    weight: Optional[int] = None
 
 
 class WeightedErrorCode(BaseModel):
@@ -447,7 +593,7 @@ class WeightedErrorCode(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     code: int
-    weight: int
+    weight: Optional[int] = None
     description: Optional[str] = None
 
 
@@ -498,6 +644,7 @@ class EmailTemplate(BaseModel):
     confidence_level: str
     threat_types: Optional[str] = None
     threat_names: Optional[str] = None
+    weight: Optional[int] = None
     threat_classification: Optional[str] = None
     detection_methods: Optional[str] = None
     is_first_contact: bool = False
@@ -2475,7 +2622,12 @@ _DEFAULT_CA_POLICIES: tuple[ConditionalAccessPolicy, ...] = (
 
 
 class World(BaseModel):
-    """Immutable per-run fixture container; frozen + hashable for lru_cache."""
+    """Immutable per-run fixture container; frozen + hashable for lru_cache.
+
+    Pool fields use `WeightedPool[Item]` so each pool carries its own
+    sampling mode (`random=True` ⇒ uniform; `random=False` ⇒ weighted with
+    a per-entry `weight`). Test/builder code may still pass plain tuples
+    or lists — they are auto-wrapped into a uniform pool."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -2485,95 +2637,151 @@ class World(BaseModel):
     on_prem_netbios_domain: str = "CONTOSO"
     on_prem_sid_prefix: str = "S-1-5-21-1004336348-1177238915-682003330"
 
-    domain_controllers: tuple[DomainController, ...] = _DEFAULT_DOMAIN_CONTROLLERS
-    devices: tuple[Device, ...] = _DEFAULT_DEVICES
-    processes: tuple[Process, ...] = _DEFAULT_PROCESSES
-    users: tuple[User, ...] = _DEFAULT_USERS
-    ips: tuple[IPEntry, ...] = _DEFAULT_IPS
-    user_agents: tuple[UserAgentEntry, ...] = _DEFAULT_USER_AGENTS
-    client_apps: tuple[ClientApp, ...] = _DEFAULT_CLIENT_APPS
-    service_principals: tuple[ServicePrincipal, ...] = _DEFAULT_SERVICE_PRINCIPALS
-    resources: tuple[Resource, ...] = _DEFAULT_RESOURCES
-    groups: tuple[Group, ...] = _DEFAULT_GROUPS
-    graph_api_endpoints: tuple[GraphApiEndpoint, ...] = _DEFAULT_GRAPH_API_ENDPOINTS
-    graph_api_locations: tuple[str, ...] = _DEFAULT_GRAPH_API_LOCATIONS
-    network_destinations: tuple[NetworkDestination, ...] = _DEFAULT_NETWORK_DESTINATIONS
-    registry_targets: tuple[RegistryTarget, ...] = _DEFAULT_REGISTRY_TARGETS
-    device_event_actions: tuple[DeviceEventAction, ...] = _DEFAULT_DEVICE_EVENT_ACTIONS
-    code_signing_certificates: tuple[CodeSigningCertificate, ...] = (
+    domain_controllers: WeightedPool[DomainController] = _pool(
+        _DEFAULT_DOMAIN_CONTROLLERS
+    )
+    devices: WeightedPool[Device] = _pool(_DEFAULT_DEVICES)
+    processes: WeightedPool[Process] = _pool(_DEFAULT_PROCESSES)
+    users: WeightedPool[User] = _pool(_DEFAULT_USERS)
+    ips: WeightedPool[IPEntry] = _pool(_DEFAULT_IPS)
+    user_agents: WeightedPool[UserAgentEntry] = _pool(_DEFAULT_USER_AGENTS)
+    client_apps: WeightedPool[ClientApp] = _pool(_DEFAULT_CLIENT_APPS)
+    service_principals: WeightedPool[ServicePrincipal] = _pool(
+        _DEFAULT_SERVICE_PRINCIPALS
+    )
+    resources: WeightedPool[Resource] = _pool(_DEFAULT_RESOURCES)
+    groups: WeightedPool[Group] = _pool(_DEFAULT_GROUPS)
+    graph_api_endpoints: WeightedPool[GraphApiEndpoint] = _pool(
+        _DEFAULT_GRAPH_API_ENDPOINTS
+    )
+    graph_api_locations: WeightedPool[ScalarEntry] = _scalar_pool(
+        _DEFAULT_GRAPH_API_LOCATIONS
+    )
+    network_destinations: WeightedPool[NetworkDestination] = _pool(
+        _DEFAULT_NETWORK_DESTINATIONS
+    )
+    registry_targets: WeightedPool[RegistryTarget] = _pool(_DEFAULT_REGISTRY_TARGETS)
+    device_event_actions: WeightedPool[DeviceEventAction] = _pool(
+        _DEFAULT_DEVICE_EVENT_ACTIONS
+    )
+    code_signing_certificates: WeightedPool[CodeSigningCertificate] = _pool(
         _DEFAULT_CODE_SIGNING_CERTIFICATES
     )
-    signed_files: tuple[str, ...] = _DEFAULT_SIGNED_FILES
-    crl_urls: tuple[str, ...] = _DEFAULT_CRL_URLS
-    loaded_libraries: tuple[LoadedLibrary, ...] = _DEFAULT_LOADED_LIBRARIES
-    device_logon_types: tuple[DeviceLogonType, ...] = _DEFAULT_DEVICE_LOGON_TYPES
-    device_logon_protocols: tuple[str, ...] = _DEFAULT_DEVICE_LOGON_PROTOCOLS
-    device_logon_failure_reasons: tuple[str, ...] = (
+    signed_files: WeightedPool[ScalarEntry] = _scalar_pool(_DEFAULT_SIGNED_FILES)
+    crl_urls: WeightedPool[ScalarEntry] = _scalar_pool(_DEFAULT_CRL_URLS)
+    loaded_libraries: WeightedPool[LoadedLibrary] = _pool(_DEFAULT_LOADED_LIBRARIES)
+    device_logon_types: WeightedPool[DeviceLogonType] = _pool(
+        _DEFAULT_DEVICE_LOGON_TYPES
+    )
+    device_logon_protocols: WeightedPool[ScalarEntry] = _scalar_pool(
+        _DEFAULT_DEVICE_LOGON_PROTOCOLS
+    )
+    device_logon_failure_reasons: WeightedPool[ScalarEntry] = _scalar_pool(
         _DEFAULT_DEVICE_LOGON_FAILURE_REASONS
     )
-    cloud_apps: tuple[CloudApp, ...] = _DEFAULT_CLOUD_APPS
-    cloud_app_file_names: tuple[str, ...] = _DEFAULT_CLOUD_APP_FILE_NAMES
-    cloud_app_mail_subjects: tuple[str, ...] = _DEFAULT_CLOUD_APP_MAIL_SUBJECTS
-    cloud_app_group_names: tuple[str, ...] = _DEFAULT_CLOUD_APP_GROUP_NAMES
-    device_network_action_types: tuple[DeviceNetworkActionType, ...] = (
+    cloud_apps: WeightedPool[CloudApp] = _pool(_DEFAULT_CLOUD_APPS)
+    cloud_app_file_names: WeightedPool[ScalarEntry] = _scalar_pool(
+        _DEFAULT_CLOUD_APP_FILE_NAMES
+    )
+    cloud_app_mail_subjects: WeightedPool[ScalarEntry] = _scalar_pool(
+        _DEFAULT_CLOUD_APP_MAIL_SUBJECTS
+    )
+    cloud_app_group_names: WeightedPool[ScalarEntry] = _scalar_pool(
+        _DEFAULT_CLOUD_APP_GROUP_NAMES
+    )
+    device_network_action_types: WeightedPool[DeviceNetworkActionType] = _pool(
         _DEFAULT_DEVICE_NETWORK_ACTIONS
     )
-    network_adapters: tuple[NetworkAdapter, ...] = _DEFAULT_NETWORK_ADAPTERS
-    local_dns_servers: tuple[str, ...] = _DEFAULT_LOCAL_DNS_SERVERS
-    local_default_gateways: tuple[str, ...] = _DEFAULT_LOCAL_DEFAULT_GATEWAYS
-    device_registry_action_types: tuple[DeviceRegistryActionType, ...] = (
+    network_adapters: WeightedPool[NetworkAdapter] = _pool(_DEFAULT_NETWORK_ADAPTERS)
+    local_dns_servers: WeightedPool[ScalarEntry] = _scalar_pool(
+        _DEFAULT_LOCAL_DNS_SERVERS
+    )
+    local_default_gateways: WeightedPool[ScalarEntry] = _scalar_pool(
+        _DEFAULT_LOCAL_DEFAULT_GATEWAYS
+    )
+    device_registry_action_types: WeightedPool[DeviceRegistryActionType] = _pool(
         _DEFAULT_DEVICE_REGISTRY_ACTIONS
     )
-    email_post_delivery_paths: tuple[EmailPostDeliveryPath, ...] = (
+    email_post_delivery_paths: WeightedPool[EmailPostDeliveryPath] = _pool(
         _DEFAULT_EMAIL_POST_DELIVERY_PATHS
     )
-    graph_api_status_codes: tuple[GraphApiStatusCode, ...] = (
+    graph_api_status_codes: WeightedPool[GraphApiStatusCode] = _pool(
         _DEFAULT_GRAPH_API_STATUS_CODES
     )
-    identity_auth_methods: tuple[str, ...] = _DEFAULT_IDENTITY_AUTH_METHODS
-    identity_risk_levels: tuple[IdentityRiskLevel, ...] = _DEFAULT_IDENTITY_RISK_LEVELS
-    identity_directory_action_types: tuple[IdentityDirectoryActionType, ...] = (
+    identity_auth_methods: WeightedPool[ScalarEntry] = _scalar_pool(
+        _DEFAULT_IDENTITY_AUTH_METHODS
+    )
+    identity_risk_levels: WeightedPool[IdentityRiskLevel] = _pool(
+        _DEFAULT_IDENTITY_RISK_LEVELS
+    )
+    identity_directory_action_types: WeightedPool[IdentityDirectoryActionType] = _pool(
         _DEFAULT_IDENTITY_DIRECTORY_ACTIONS
     )
-    identity_raw_actions: tuple[IdentityRawAction, ...] = _DEFAULT_IDENTITY_RAW_ACTIONS
-    identity_event_group_names: tuple[str, ...] = _DEFAULT_IDENTITY_EVENT_GROUP_NAMES
-    identity_event_app_names: tuple[str, ...] = _DEFAULT_IDENTITY_EVENT_APP_NAMES
-    identity_logon_types: tuple[IdentityLogonType, ...] = _DEFAULT_IDENTITY_LOGON_TYPES
-    identity_logon_protocols: tuple[IdentityLogonProtocol, ...] = (
+    identity_raw_actions: WeightedPool[IdentityRawAction] = _pool(
+        _DEFAULT_IDENTITY_RAW_ACTIONS
+    )
+    identity_event_group_names: WeightedPool[ScalarEntry] = _scalar_pool(
+        _DEFAULT_IDENTITY_EVENT_GROUP_NAMES
+    )
+    identity_event_app_names: WeightedPool[ScalarEntry] = _scalar_pool(
+        _DEFAULT_IDENTITY_EVENT_APP_NAMES
+    )
+    identity_logon_types: WeightedPool[IdentityLogonType] = _pool(
+        _DEFAULT_IDENTITY_LOGON_TYPES
+    )
+    identity_logon_protocols: WeightedPool[IdentityLogonProtocol] = _pool(
         _DEFAULT_IDENTITY_LOGON_PROTOCOLS
     )
-    identity_logon_failure_reasons: tuple[str, ...] = (
+    identity_logon_failure_reasons: WeightedPool[ScalarEntry] = _scalar_pool(
         _DEFAULT_IDENTITY_LOGON_FAILURE_REASONS
     )
-    identity_query_kinds: tuple[IdentityQueryKind, ...] = _DEFAULT_IDENTITY_QUERY_KINDS
-    identity_query_group_targets: tuple[str, ...] = (
+    identity_query_kinds: WeightedPool[IdentityQueryKind] = _pool(
+        _DEFAULT_IDENTITY_QUERY_KINDS
+    )
+    identity_query_group_targets: WeightedPool[ScalarEntry] = _scalar_pool(
         _DEFAULT_IDENTITY_QUERY_GROUP_TARGETS
     )
-    identity_query_computer_targets: tuple[str, ...] = (
+    identity_query_computer_targets: WeightedPool[ScalarEntry] = _scalar_pool(
         _DEFAULT_IDENTITY_QUERY_COMPUTER_TARGETS
     )
-    url_click_outcomes: tuple[UrlClickOutcome, ...] = _DEFAULT_URL_CLICK_OUTCOMES
-    url_click_workloads: tuple[WeightedWorkload, ...] = _DEFAULT_URL_CLICK_WORKLOADS
-    file_templates: tuple[FileTemplate, ...] = _DEFAULT_FILE_TEMPLATES
-    file_action_types: tuple[FileActionType, ...] = _DEFAULT_FILE_ACTION_TYPES
-    file_sensitivity_labels: tuple[SensitivityLabel, ...] = (
+    url_click_outcomes: WeightedPool[UrlClickOutcome] = _pool(
+        _DEFAULT_URL_CLICK_OUTCOMES
+    )
+    url_click_workloads: WeightedPool[WeightedWorkload] = _pool(
+        _DEFAULT_URL_CLICK_WORKLOADS
+    )
+    file_templates: WeightedPool[FileTemplate] = _pool(_DEFAULT_FILE_TEMPLATES)
+    file_action_types: WeightedPool[FileActionType] = _pool(_DEFAULT_FILE_ACTION_TYPES)
+    file_sensitivity_labels: WeightedPool[SensitivityLabel] = _pool(
         _DEFAULT_FILE_SENSITIVITY_LABELS
     )
-    file_download_hosts: tuple[str, ...] = _DEFAULT_FILE_DOWNLOAD_HOSTS
-    conditional_access_policies: tuple[ConditionalAccessPolicy, ...] = (
+    file_download_hosts: WeightedPool[ScalarEntry] = _scalar_pool(
+        _DEFAULT_FILE_DOWNLOAD_HOSTS
+    )
+    conditional_access_policies: WeightedPool[ConditionalAccessPolicy] = _pool(
         _DEFAULT_CA_POLICIES
     )
-    entra_sign_in_error_codes: tuple[WeightedErrorCode, ...] = (
+    entra_sign_in_error_codes: WeightedPool[WeightedErrorCode] = _pool(
         _DEFAULT_ENTRA_SIGN_IN_ERROR_CODES
     )
-    entra_spn_sign_in_error_codes: tuple[WeightedErrorCode, ...] = (
+    entra_spn_sign_in_error_codes: WeightedPool[WeightedErrorCode] = _pool(
         _DEFAULT_ENTRA_SPN_SIGN_IN_ERROR_CODES
     )
-    email_templates: tuple[EmailTemplate, ...] = _DEFAULT_EMAIL_TEMPLATES
+    email_templates: WeightedPool[EmailTemplate] = _pool(_DEFAULT_EMAIL_TEMPLATES)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _wrap_pools(cls, data):
+        return _auto_wrap_pools(cls, data)
 
 
 class Overrides(BaseModel):
-    """YAML patch on World defaults; collection overrides replace, never merge."""
+    """YAML patch on World defaults; collection overrides replace, never merge.
+
+    Each pool override accepts two YAML shapes:
+      • a bare list of items → uniform sampling (current default).
+      • a wrapper `{random: false, entries: [...]}` → every entry must
+        declare `weight`; sampling is weighted in generators."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -2583,61 +2791,70 @@ class Overrides(BaseModel):
     on_prem_netbios_domain: Optional[str] = None
     on_prem_sid_prefix: Optional[str] = None
 
-    domain_controllers: Optional[list[DomainController]] = None
-    devices: Optional[list[Device]] = None
-    processes: Optional[list[Process]] = None
-    users: Optional[list[User]] = None
-    ips: Optional[list[IPEntry]] = None
-    user_agents: Optional[list[UserAgentEntry]] = None
-    resources: Optional[list[Resource]] = None
-    client_apps: Optional[list[ClientApp]] = None
-    service_principals: Optional[list[ServicePrincipal]] = None
-    groups: Optional[list[Group]] = None
-    graph_api_endpoints: Optional[list[GraphApiEndpoint]] = None
-    graph_api_locations: Optional[list[str]] = None
-    network_destinations: Optional[list[NetworkDestination]] = None
-    registry_targets: Optional[list[RegistryTarget]] = None
-    device_event_actions: Optional[list[DeviceEventAction]] = None
-    code_signing_certificates: Optional[list[CodeSigningCertificate]] = None
-    signed_files: Optional[list[str]] = None
-    crl_urls: Optional[list[str]] = None
-    loaded_libraries: Optional[list[LoadedLibrary]] = None
-    device_logon_types: Optional[list[DeviceLogonType]] = None
-    device_logon_protocols: Optional[list[str]] = None
-    device_logon_failure_reasons: Optional[list[str]] = None
-    cloud_apps: Optional[list[CloudApp]] = None
-    cloud_app_file_names: Optional[list[str]] = None
-    cloud_app_mail_subjects: Optional[list[str]] = None
-    cloud_app_group_names: Optional[list[str]] = None
-    device_network_action_types: Optional[list[DeviceNetworkActionType]] = None
-    network_adapters: Optional[list[NetworkAdapter]] = None
-    local_dns_servers: Optional[list[str]] = None
-    local_default_gateways: Optional[list[str]] = None
-    device_registry_action_types: Optional[list[DeviceRegistryActionType]] = None
-    email_post_delivery_paths: Optional[list[EmailPostDeliveryPath]] = None
-    graph_api_status_codes: Optional[list[GraphApiStatusCode]] = None
-    identity_auth_methods: Optional[list[str]] = None
-    identity_risk_levels: Optional[list[IdentityRiskLevel]] = None
-    identity_directory_action_types: Optional[list[IdentityDirectoryActionType]] = None
-    identity_raw_actions: Optional[list[IdentityRawAction]] = None
-    identity_event_group_names: Optional[list[str]] = None
-    identity_event_app_names: Optional[list[str]] = None
-    identity_logon_types: Optional[list[IdentityLogonType]] = None
-    identity_logon_protocols: Optional[list[IdentityLogonProtocol]] = None
-    identity_logon_failure_reasons: Optional[list[str]] = None
-    identity_query_kinds: Optional[list[IdentityQueryKind]] = None
-    identity_query_group_targets: Optional[list[str]] = None
-    identity_query_computer_targets: Optional[list[str]] = None
-    url_click_outcomes: Optional[list[UrlClickOutcome]] = None
-    url_click_workloads: Optional[list[WeightedWorkload]] = None
-    file_templates: Optional[list[FileTemplate]] = None
-    file_action_types: Optional[list[FileActionType]] = None
-    file_sensitivity_labels: Optional[list[SensitivityLabel]] = None
-    file_download_hosts: Optional[list[str]] = None
-    conditional_access_policies: Optional[list[ConditionalAccessPolicy]] = None
-    entra_sign_in_error_codes: Optional[list[WeightedErrorCode]] = None
-    entra_spn_sign_in_error_codes: Optional[list[WeightedErrorCode]] = None
-    email_templates: Optional[list[EmailTemplate]] = None
+    domain_controllers: Optional[WeightedPool[DomainController]] = None
+    devices: Optional[WeightedPool[Device]] = None
+    processes: Optional[WeightedPool[Process]] = None
+    users: Optional[WeightedPool[User]] = None
+    ips: Optional[WeightedPool[IPEntry]] = None
+    user_agents: Optional[WeightedPool[UserAgentEntry]] = None
+    resources: Optional[WeightedPool[Resource]] = None
+    client_apps: Optional[WeightedPool[ClientApp]] = None
+    service_principals: Optional[WeightedPool[ServicePrincipal]] = None
+    groups: Optional[WeightedPool[Group]] = None
+    graph_api_endpoints: Optional[WeightedPool[GraphApiEndpoint]] = None
+    graph_api_locations: Optional[WeightedPool[ScalarEntry]] = None
+    network_destinations: Optional[WeightedPool[NetworkDestination]] = None
+    registry_targets: Optional[WeightedPool[RegistryTarget]] = None
+    device_event_actions: Optional[WeightedPool[DeviceEventAction]] = None
+    code_signing_certificates: Optional[WeightedPool[CodeSigningCertificate]] = None
+    signed_files: Optional[WeightedPool[ScalarEntry]] = None
+    crl_urls: Optional[WeightedPool[ScalarEntry]] = None
+    loaded_libraries: Optional[WeightedPool[LoadedLibrary]] = None
+    device_logon_types: Optional[WeightedPool[DeviceLogonType]] = None
+    device_logon_protocols: Optional[WeightedPool[ScalarEntry]] = None
+    device_logon_failure_reasons: Optional[WeightedPool[ScalarEntry]] = None
+    cloud_apps: Optional[WeightedPool[CloudApp]] = None
+    cloud_app_file_names: Optional[WeightedPool[ScalarEntry]] = None
+    cloud_app_mail_subjects: Optional[WeightedPool[ScalarEntry]] = None
+    cloud_app_group_names: Optional[WeightedPool[ScalarEntry]] = None
+    device_network_action_types: Optional[WeightedPool[DeviceNetworkActionType]] = None
+    network_adapters: Optional[WeightedPool[NetworkAdapter]] = None
+    local_dns_servers: Optional[WeightedPool[ScalarEntry]] = None
+    local_default_gateways: Optional[WeightedPool[ScalarEntry]] = None
+    device_registry_action_types: Optional[WeightedPool[DeviceRegistryActionType]] = (
+        None
+    )
+    email_post_delivery_paths: Optional[WeightedPool[EmailPostDeliveryPath]] = None
+    graph_api_status_codes: Optional[WeightedPool[GraphApiStatusCode]] = None
+    identity_auth_methods: Optional[WeightedPool[ScalarEntry]] = None
+    identity_risk_levels: Optional[WeightedPool[IdentityRiskLevel]] = None
+    identity_directory_action_types: Optional[
+        WeightedPool[IdentityDirectoryActionType]
+    ] = None
+    identity_raw_actions: Optional[WeightedPool[IdentityRawAction]] = None
+    identity_event_group_names: Optional[WeightedPool[ScalarEntry]] = None
+    identity_event_app_names: Optional[WeightedPool[ScalarEntry]] = None
+    identity_logon_types: Optional[WeightedPool[IdentityLogonType]] = None
+    identity_logon_protocols: Optional[WeightedPool[IdentityLogonProtocol]] = None
+    identity_logon_failure_reasons: Optional[WeightedPool[ScalarEntry]] = None
+    identity_query_kinds: Optional[WeightedPool[IdentityQueryKind]] = None
+    identity_query_group_targets: Optional[WeightedPool[ScalarEntry]] = None
+    identity_query_computer_targets: Optional[WeightedPool[ScalarEntry]] = None
+    url_click_outcomes: Optional[WeightedPool[UrlClickOutcome]] = None
+    url_click_workloads: Optional[WeightedPool[WeightedWorkload]] = None
+    file_templates: Optional[WeightedPool[FileTemplate]] = None
+    file_action_types: Optional[WeightedPool[FileActionType]] = None
+    file_sensitivity_labels: Optional[WeightedPool[SensitivityLabel]] = None
+    file_download_hosts: Optional[WeightedPool[ScalarEntry]] = None
+    conditional_access_policies: Optional[WeightedPool[ConditionalAccessPolicy]] = None
+    entra_sign_in_error_codes: Optional[WeightedPool[WeightedErrorCode]] = None
+    entra_spn_sign_in_error_codes: Optional[WeightedPool[WeightedErrorCode]] = None
+    email_templates: Optional[WeightedPool[EmailTemplate]] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _wrap_pools(cls, data):
+        return _auto_wrap_pools(cls, data)
 
 
 class Profile(BaseModel):

@@ -4,6 +4,7 @@ import json
 import random
 
 from generators.base import register
+from generators.common import pick, pick_many
 from generators.device_common import envelope, pick_device
 from models import DeviceNetworkInfo
 from world import World
@@ -16,7 +17,7 @@ def _mac_addr() -> str:
 @register("DeviceNetworkInfo")
 def generate(world: World) -> DeviceNetworkInfo:
     device = pick_device(world)
-    adapter = random.choice(world.network_adapters)
+    adapter = pick(world.network_adapters)
 
     local_ip = device.local_ip or f"10.10.20.{random.randint(2, 254)}"
     mac = device.mac_address or _mac_addr()
@@ -38,13 +39,13 @@ def generate(world: World) -> DeviceNetworkInfo:
         }
     ]
 
-    dns_count = min(2, len(world.local_dns_servers))
+    dns_servers = [e.value for e in pick_many(world.local_dns_servers, 2)]
     return DeviceNetworkInfo(
         ConnectedNetworks=json.dumps(connected_networks),
-        DefaultGateways=json.dumps([random.choice(world.local_default_gateways)]),
-        DnsAddresses=json.dumps(random.sample(world.local_dns_servers, k=dns_count)),
+        DefaultGateways=json.dumps([pick(world.local_default_gateways).value]),
+        DnsAddresses=json.dumps(dns_servers),
         IPAddresses=json.dumps(ip_addresses),
-        IPv4Dhcp=random.choice(world.local_default_gateways),
+        IPv4Dhcp=pick(world.local_default_gateways).value,
         IPv6Dhcp=None,
         MacAddress=mac,
         NetworkAdapterName=adapter.name,

@@ -4,37 +4,30 @@ import random
 
 from models import IdentityLogonEvents
 from generators.base import register
-from generators.common import now_utc
+from generators.common import now_utc, pick, pick_filtered
 from world import World
 
 
 @register("IdentityLogonEvents")
 def generate(world: World) -> IdentityLogonEvents:
-    user = random.choice(world.users)
-    ip = random.choice(world.ips)
-    ua = random.choice(world.user_agents)
-    dc = random.choice(world.domain_controllers)
+    user = pick(world.users)
+    ip = pick(world.ips)
+    ua = pick(world.user_agents)
+    dc = pick(world.domain_controllers)
     timestamp = now_utc()
 
     success = random.random() < 0.92
     action_type = "LogonSuccess" if success else "LogonFailed"
 
-    logon_type = random.choices(
-        [t.logon_type for t in world.identity_logon_types],
-        weights=[t.weight for t in world.identity_logon_types],
-        k=1,
-    )[0]
+    logon_type = pick(world.identity_logon_types).logon_type
 
     # Service / Batch logons go via Kerberos TGT (when available).
     if logon_type in ("Service", "Batch"):
-        protocol_choices = [
-            p for p in world.identity_logon_protocols if p.protocol == "Kerberos"
-        ] or list(world.identity_logon_protocols)
+        picked_protocol = pick_filtered(
+            world.identity_logon_protocols, lambda p: p.protocol == "Kerberos"
+        )
     else:
-        protocol_choices = list(world.identity_logon_protocols)
-    picked_protocol = random.choices(
-        protocol_choices, weights=[p.weight for p in protocol_choices], k=1
-    )[0]
+        picked_protocol = pick(world.identity_logon_protocols)
     protocol = picked_protocol.protocol
     destination_port = picked_protocol.port
 
@@ -60,7 +53,7 @@ def generate(world: World) -> IdentityLogonEvents:
         DeviceName=user.device_name,
         DeviceType="Server" if logon_type == "Service" else ua.device_type,
         FailureReason=(
-            random.choice(world.identity_logon_failure_reasons) if not success else None
+            pick(world.identity_logon_failure_reasons).value if not success else None
         ),
         IPAddress=ip.ip,
         ISP=ip.isp,

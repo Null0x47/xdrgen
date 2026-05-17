@@ -6,7 +6,7 @@ import uuid
 
 from models import UrlClickEvents
 from generators.base import register
-from generators.common import now_utc
+from generators.common import now_utc, pick, pick_filtered
 from generators.email_pool import pool_for
 from world import World
 
@@ -29,14 +29,10 @@ def generate(world: World) -> UrlClickEvents:
     email = pool_for(world).pick_with_urls()
     url_entry = random.choice(email["urls"])
     recipient = email["recipient"]
-    ip = random.choice(world.ips)
+    ip = pick(world.ips)
     timestamp = now_utc()
 
-    outcome = random.choices(
-        world.url_click_outcomes,
-        weights=[o.weight for o in world.url_click_outcomes],
-        k=1,
-    )[0]
+    outcome = pick(world.url_click_outcomes)
     action_type = outcome.action_type
     is_clicked_through = outcome.is_clicked_through
     threat_types_outcome = outcome.threat_types
@@ -45,19 +41,15 @@ def generate(world: World) -> UrlClickEvents:
     # known-phish URLs.
     threat_types = email["threat_types"] or threat_types_outcome
     if threat_types in ("Phish", "Malware"):
-        blockers = [
-            o
-            for o in world.url_click_outcomes
-            if not o.is_clicked_through or o.action_type == "BlockpageOverride"
-        ] or list(world.url_click_outcomes)
-        chosen = random.choice(blockers)
+        chosen = pick_filtered(
+            world.url_click_outcomes,
+            lambda o: (
+                (not o.is_clicked_through) or o.action_type == "BlockpageOverride"
+            ),
+        )
         action_type, is_clicked_through = chosen.action_type, chosen.is_clicked_through
 
-    workload = random.choices(
-        [w.workload for w in world.url_click_workloads],
-        weights=[w.weight for w in world.url_click_workloads],
-        k=1,
-    )[0]
+    workload = pick(world.url_click_workloads).workload
 
     detection_methods = email["detection_methods"] if threat_types else None
 

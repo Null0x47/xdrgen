@@ -97,7 +97,7 @@ uv run xdrgen generate --sink csv
 
 ### Profile
 
-The YAML profile is optional. Without one, every table that has a generator is emitted using the default `contoso.com` tenant fixture. With one, you can select a subset of tables and/or override fixtures so the stream looks like it came from *your* tenant. Overridable knobs include tenant identity (tenant id, domain, on-prem AD, SID prefix), user / device / IP / user-agent / process / loaded-library / code-signing-cert pools, Entra fixtures (conditional access policies, service principals, resources, client apps, sign-in error codes), Graph API endpoint catalogue + regions + status-code distribution, every Device* ActionType pool (`DeviceEvents`, `DeviceFileEvents`, `DeviceLogonEvents`, `DeviceNetworkEvents`, `DeviceRegistryEvents`), DeviceFileEvents file templates / download hosts / sensitivity labels, DeviceLogonEvents logon types / protocols / failure reasons, DeviceNetworkInfo adapters / DNS / gateways, CloudAppEvents connectors / file / mail / group pools, Identity* action/protocol/query/risk-level pools, UrlClickEvents outcomes / workloads, email templates, post-delivery paths, and more.
+The YAML profile is optional. Without one, every table that has a generator is emitted using the default `contoso.com` tenant fixture. With one, you can select a subset of tables and/or override fixtures so the stream looks like it came from *your* tenant. Every override below replaces the matching default in full — collections are never merged.
 
 A fully documented example is shipped at [`profile.example.yaml`](./profile.example.yaml) — copy it and edit:
 
@@ -107,6 +107,124 @@ uv run xdrgen generate profile.yaml -n 100
 ```
 
 The profile is validated by Pydantic models in [`world.py`](./world.py); unknown keys, wrong shapes, and missing required sub-fields fail fast.
+
+#### Overridable fixtures
+
+**Tenant identity** (scalars)
+
+- `tenant_id` — Entra tenant GUID stamped on every row.
+- `tenant_domain` — primary verified domain (e.g. `contoso.com`).
+- `on_prem_ad_domain` — on-prem AD FQDN used by Identity* / Device* logon rows.
+- `on_prem_netbios_domain` — pre-Windows-2000 short domain name.
+- `on_prem_sid_prefix` — shared SID prefix (`S-1-5-21-…`) for per-user RIDs.
+
+**Shared identity pools**
+
+- `users` — user / service-account / guest catalogue (drives every account-bearing row).
+- `devices` — MDE-managed endpoints feeding every Device* table.
+- `ips` — source IPs with paired geo / ISP / category fields.
+- `user_agents` — UA / platform / device-type / browser tuples.
+- `processes` — InitiatingProcess catalogue (paths, version-info, signed flags).
+- `domain_controllers` — DCs that terminate Identity* logon / query / directory rows.
+- `groups` — Entra ID directory groups surfaced in Graph URIs.
+
+**Entra ID** (`EntraIdSignInEvents`, `EntraIdSpnSignInEvents`)
+
+- `client_apps` — first-party / line-of-business client apps + real app IDs.
+- `service_principals` — workload identities (app SPNs, managed identities, CI/CD).
+- `resources` — `ResourceDisplayName` / `ResourceId` target catalogue.
+- `conditional_access_policies` — CA policies serialized into the `ConditionalAccessPolicies` JSON column.
+- `entra_sign_in_error_codes` — weighted user-sign-in `ErrorCode` distribution + descriptions.
+- `entra_spn_sign_in_error_codes` — weighted workload-identity `ErrorCode` distribution.
+
+**Graph API** (`GraphApiAuditEvents`)
+
+- `graph_api_endpoints` — `{method, uri, workload, scope}` catalogue of Graph calls.
+- `graph_api_locations` — Azure regions stamped on `Location`.
+- `graph_api_status_codes` — weighted HTTP response-code distribution.
+
+**Defender for Endpoint** (Device* tables)
+
+- `device_event_actions` — weighted `{action, shape, weight}` pool for `DeviceEvents.ActionType` (`shape ∈ {file, network, registry, none}` drives the auxiliary column block).
+- `device_network_action_types` — weighted `DeviceNetworkEvents.ActionType` pool.
+- `device_registry_action_types` — weighted `DeviceRegistryEvents.ActionType` pool.
+- `file_action_types` — weighted `DeviceFileEvents.ActionType` pool.
+- `device_logon_types` — weighted `DeviceLogonEvents.LogonType` pool.
+- `device_logon_protocols` — auth protocol pool (`Kerberos`, `Ntlm`, `NetLogon`).
+- `device_logon_failure_reasons` — failure-reason strings used only on `LogonFailed`.
+- `network_destinations` — `{port, url}` outbound destination pool for `DeviceNetworkEvents`.
+- `network_adapters` — Wi-Fi / Ethernet / VPN adapters for `DeviceNetworkInfo`.
+- `local_dns_servers` — local DNS resolver pool (sampled k=2 — uniform-only).
+- `local_default_gateways` — default-gateway pool.
+- `file_templates` — `{folder_template, file_name, kind}` for `DeviceFileEvents` (`kind ∈ {download, doc, temp, share}` drives row shape).
+- `file_sensitivity_labels` — `{label, sublabel}` fallback for randomly classified local documents.
+- `file_download_hosts` — hosts rendered into `FileOriginUrl` / `FileOriginReferrerUrl`.
+- `code_signing_certificates` — cert catalogue for `DeviceFileCertificateInfo`.
+- `signed_files` — filename pool driving `SHA1` on signed-binary rows.
+- `crl_urls` — CRL distribution-point URLs.
+- `loaded_libraries` — `{file_name, folder_path}` DLL / assembly pool for `DeviceImageLoadEvents`.
+- `registry_targets` — `{key, value_name, value_data, value_type}` registry target pool.
+
+**Cloud Apps** (`CloudAppEvents`)
+
+- `cloud_apps` — `{name, app_id, instance_id, audit_source, actions}` connector catalogue.
+- `cloud_app_file_names` — `ObjectName` pool for File-shaped activities.
+- `cloud_app_mail_subjects` — `ObjectName` pool for Email-shaped activities.
+- `cloud_app_group_names` — `ObjectName` pool for Group-shaped activities.
+
+**Defender for Identity / unified IdentityEvents**
+
+- `identity_auth_methods` — `AuthenticationMethod` pool (`IdentityAccountInfo`).
+- `identity_risk_levels` — weighted `DefenderRiskLevel` distribution (0 = None .. 3 = High).
+- `identity_directory_action_types` — weighted `IdentityDirectoryEvents.ActionType` pool.
+- `identity_raw_actions` — `{action, application, target_kind, weight}` for `IdentityEvents` (`target_kind ∈ {user, group, app, policy}`).
+- `identity_event_group_names` — group-name pool used as `TargetObjects.Name` for group actions.
+- `identity_event_app_names` — app-name pool for app actions.
+- `identity_logon_types` — weighted `IdentityLogonEvents.LogonType` pool.
+- `identity_logon_protocols` — weighted `{protocol, port}` pool (Service/Batch still routes Kerberos).
+- `identity_logon_failure_reasons` — failure-reason strings on `LogonFailed`.
+- `identity_query_kinds` — weighted `{query_type, protocol, port}` pool for `IdentityQueryEvents`.
+- `identity_query_group_targets` — `QueryTarget` strings for group queries.
+- `identity_query_computer_targets` — `QueryTarget` strings for computer / `Resolve` queries.
+
+**Email / URL clicks** (`Email*` + `UrlClickEvents`)
+
+- `email_templates` — full pre-built email catalogue feeding every Email* + UrlClickEvents row (pivot key: `NetworkMessageId`).
+- `email_post_delivery_paths` — `{action, action_type, trigger, result, delivery_location}` for `EmailPostDeliveryEvents`.
+- `url_click_outcomes` — weighted `{action_type, is_clicked_through, threat_types, weight}` for `UrlClickEvents`.
+- `url_click_workloads` — weighted source workload pool (`Email` / `Teams` / `Office`).
+
+#### Weighted sampling (opt-in)
+
+Every pool override accepts two YAML shapes:
+
+1. **Bare list** — sample uniformly. Any per-entry `weight` is ignored.
+
+   ```yaml
+   devices:
+     - device_id: ws01
+       device_name: WS-01
+     - device_id: ws02
+       device_name: WS-02
+   ```
+
+2. **`{random: false, entries: [...]}`** — sample weighted. Every entry must declare `weight`; the profile loader fails fast otherwise.
+
+   ```yaml
+   devices:
+     random: false
+     entries:
+       - device_id: ws01
+         device_name: WS-01
+         weight: 10
+       - device_id: ws02
+         device_name: WS-02
+         weight: 1
+   ```
+
+Scalar pools (e.g. `cloud_app_file_names`, `local_dns_servers`, `graph_api_locations`) accept the same two shapes — either a bare string list, or `{random: false, entries: [{value, weight}, ...]}`.
+
+Caveat: pools sampled with `random.sample` (k>1) — currently `local_dns_servers` and the DNS slot of `DeviceNetworkInfo` — still pick uniformly even when `random: false`. The validator still enforces weights are present.
 
 #### Threat profiles
 

@@ -7,17 +7,17 @@ from datetime import timedelta
 
 from models import EntraIdSignInEvents
 from generators.base import register
-from generators.common import now_utc
-from world import ConditionalAccessPolicy, World
+from generators.common import now_utc, pick
+from world import WeightedPool, ConditionalAccessPolicy, World
 
 
 def _conditional_access_payload(
-    policies: tuple[ConditionalAccessPolicy, ...], success: bool
+    policies: WeightedPool[ConditionalAccessPolicy], success: bool
 ) -> tuple[str, int]:
     """Return (JSON policies, ConditionalAccessStatus). Status: 0=applied, 1=failed, 2=notApplied."""
-    if not policies:
+    if len(policies) == 0:
         return "[]", 0 if success else 2
-    sample = random.sample(policies, k=random.randint(1, len(policies)))
+    sample = random.sample(policies.entries, k=random.randint(1, len(policies)))
     if success:
         status = 0
         result = "success"
@@ -39,18 +39,14 @@ def _conditional_access_payload(
 
 @register("EntraIdSignInEvents")
 def generate(world: World) -> EntraIdSignInEvents:
-    user = random.choice(world.users)
-    ip = random.choice(world.ips)
-    ua = random.choice(world.user_agents)
-    app = random.choice(world.client_apps)
-    resource = random.choice(world.resources)
+    user = pick(world.users)
+    ip = pick(world.ips)
+    ua = pick(world.user_agents)
+    app = pick(world.client_apps)
+    resource = pick(world.resources)
     timestamp = now_utc()
 
-    error_entry = random.choices(
-        world.entra_sign_in_error_codes,
-        weights=[c.weight for c in world.entra_sign_in_error_codes],
-        k=1,
-    )[0]
+    error_entry = pick(world.entra_sign_in_error_codes)
     error_code = error_entry.code
     success = error_code == 0
 

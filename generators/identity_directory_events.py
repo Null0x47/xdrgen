@@ -4,23 +4,19 @@ import random
 
 from models import IdentityDirectoryEvents
 from generators.base import register
-from generators.common import now_utc
+from generators.common import now_utc, pick
 from world import World
 
 
 @register("IdentityDirectoryEvents")
 def generate(world: World) -> IdentityDirectoryEvents:
-    actor = random.choice(world.users)
-    target = random.choice(world.users)
-    ip = random.choice(world.ips)
-    dc = random.choice(world.domain_controllers)
+    actor = pick(world.users)
+    target = pick(world.users)
+    ip = pick(world.ips)
+    dc = pick(world.domain_controllers)
     timestamp = now_utc()
 
-    action_type = random.choices(
-        [a.action for a in world.identity_directory_action_types],
-        weights=[a.weight for a in world.identity_directory_action_types],
-        k=1,
-    )[0]
+    action_type = pick(world.identity_directory_action_types).action
 
     return IdentityDirectoryEvents(
         AccountDisplayName=actor.display_name,

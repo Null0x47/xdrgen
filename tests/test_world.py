@@ -10,6 +10,7 @@ from world import (
     Profile,
     User,
     WeightedErrorCode,
+    WeightedPool,
     World,
 )
 
@@ -67,12 +68,14 @@ def test_world_is_frozen():
         w.tenant_id = "northwind"
 
 
-def test_world_collections_are_tuples():
-    """Tuples make World hashable + immutable."""
+def test_world_pool_fields_are_weighted_pools():
+    """WeightedPool wraps each pool — frozen + hashable, with a uniform default."""
     w = World()
-    assert isinstance(w.users, tuple)
-    assert isinstance(w.ips, tuple)
-    assert isinstance(w.client_apps, tuple)
+    assert isinstance(w.users, WeightedPool)
+    assert isinstance(w.ips, WeightedPool)
+    assert isinstance(w.client_apps, WeightedPool)
+    assert w.users.random is True
+    assert isinstance(w.users.entries, tuple)
 
 
 def test_world_is_hashable():
@@ -178,3 +181,185 @@ def test_domain_controller_round_trip_via_overrides():
 def test_ip_entry_requires_geo_fields():
     with pytest.raises(ValidationError):
         IPEntry(ip="9.9.9.9")
+
+
+def test_weighted_pool_random_false_requires_weight_on_every_entry():
+    """`random: false` must reject entries missing `weight`."""
+    with pytest.raises(ValidationError):
+        Profile.model_validate(
+            {
+                "overrides": {
+                    "devices": {
+                        "random": False,
+                        "entries": [
+                            {"device_id": "1", "device_name": "ws01", "weight": 5},
+                            {"device_id": "2", "device_name": "ws02"},
+                        ],
+                    }
+                }
+            }
+        )
+
+
+def test_weighted_pool_random_false_biases_distribution():
+    """`random: false` actually picks weighted — heavy entries dominate."""
+    import random as _random
+
+    from generators.common import pick
+
+    prof = Profile.model_validate(
+        {
+            "overrides": {
+                "devices": {
+                    "random": False,
+                    "entries": [
+                        {"device_id": "heavy", "device_name": "ws01", "weight": 99},
+                        {"device_id": "light", "device_name": "ws02", "weight": 1},
+                    ],
+                }
+            }
+        }
+    )
+    world = prof.build_world()
+    _random.seed(0)
+    picks = [pick(world.devices).device_id for _ in range(500)]
+    heavy_ratio = picks.count("heavy") / len(picks)
+    assert heavy_ratio > 0.9, f"expected heavy dominance, got {heavy_ratio:.2f}"
+
+
+def test_weighted_pool_random_true_ignores_weight():
+    """`random: true` (default) samples uniformly, ignoring any per-entry weight."""
+    import random as _random
+
+    from generators.common import pick
+
+    prof = Profile.model_validate(
+        {
+            "overrides": {
+                "devices": [
+                    {"device_id": "a", "device_name": "ws01", "weight": 99},
+                    {"device_id": "b", "device_name": "ws02", "weight": 1},
+                ]
+            }
+        }
+    )
+    world = prof.build_world()
+    assert world.devices.random is True
+    _random.seed(0)
+    picks = [pick(world.devices).device_id for _ in range(500)]
+    a_ratio = picks.count("a") / len(picks)
+    # Uniform — within ±10% of 0.5 (would be ~0.99 if weights were honored).
+    assert 0.4 < a_ratio < 0.6, f"expected uniform, got {a_ratio:.2f}"
+
+
+def test_weighted_pool_plain_list_shorthand_is_uniform():
+    """Bare list overrides keep the legacy YAML shape and sample uniformly."""
+    prof = Profile.model_validate(
+        {
+            "overrides": {
+                "users": [{"display_name": "X", "upn": "x@x", "object_id": "1"}]
+            }
+        }
+    )
+    world = prof.build_world()
+    assert world.users.random is True
+    assert len(world.users) == 1
+
+
+def test_scalar_pool_accepts_bare_strings():
+    """`cloud_app_file_names: ["a.docx"]` is coerced to `[{value: "a.docx"}]`."""
+    prof = Profile.model_validate(
+        {"overrides": {"cloud_app_file_names": ["report.docx", "salary.xlsx"]}}
+    )
+    world = prof.build_world()
+    assert world.cloud_app_file_names.random is True
+    assert [e.value for e in world.cloud_app_file_names] == [
+        "report.docx",
+        "salary.xlsx",
+    ]
+
+
+def test_scalar_pool_weighted_form_is_honored():
+    """`{random: false, entries: [{value, weight}, ...]}` is validated and used."""
+    import random as _random
+
+    from generators.common import pick
+
+    prof = Profile.model_validate(
+        {
+            "overrides": {
+                "cloud_app_file_names": {
+                    "random": False,
+                    "entries": [
+                        {"value": "heavy.docx", "weight": 99},
+                        {"value": "light.docx", "weight": 1},
+                    ],
+                }
+            }
+        }
+    )
+    world = prof.build_world()
+    assert world.cloud_app_file_names.random is False
+    _random.seed(0)
+    picks = [pick(world.cloud_app_file_names).value for _ in range(200)]
+    assert picks.count("heavy.docx") / len(picks) > 0.9
+
+
+def test_scalar_pool_weighted_form_requires_weight():
+    """Scalar pools enforce `weight` per entry when `random: false`."""
+    with pytest.raises(ValidationError):
+        Profile.model_validate(
+            {
+                "overrides": {
+                    "cloud_app_file_names": {
+                        "random": False,
+                        "entries": [{"value": "a.docx"}, {"value": "b.docx"}],
+                    }
+                }
+            }
+        )
+
+
+def test_pick_filtered_respects_random_flag():
+    """`pick_filtered` filters first, then dispatches uniform or weighted."""
+    import random as _random
+
+    from generators.common import pick_filtered
+
+    prof = Profile.model_validate(
+        {
+            "overrides": {
+                "devices": {
+                    "random": False,
+                    "entries": [
+                        {
+                            "device_id": "win-heavy",
+                            "device_name": "ws01",
+                            "weight": 99,
+                            "os_platform": "Windows10",
+                        },
+                        {
+                            "device_id": "win-light",
+                            "device_name": "ws02",
+                            "weight": 1,
+                            "os_platform": "Windows10",
+                        },
+                        {
+                            "device_id": "linux-heavy",
+                            "device_name": "lx01",
+                            "weight": 50,
+                            "os_platform": "Linux",
+                        },
+                    ],
+                }
+            }
+        }
+    )
+    world = prof.build_world()
+    _random.seed(0)
+    picks = [
+        pick_filtered(world.devices, lambda d: d.os_platform == "Windows10").device_id
+        for _ in range(300)
+    ]
+    assert "linux-heavy" not in picks
+    assert picks.count("win-heavy") / len(picks) > 0.9

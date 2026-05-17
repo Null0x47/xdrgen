@@ -5,7 +5,7 @@ import uuid
 
 from models import IdentityEvents
 from generators.base import register
-from generators.common import now_utc
+from generators.common import now_utc, pick
 from world import User, World
 
 
@@ -22,7 +22,7 @@ def _target_objects(kind: str, user: User, world: World) -> list[dict]:
         return [
             {
                 "Type": "group",
-                "Name": random.choice(world.identity_event_group_names),
+                "Name": pick(world.identity_event_group_names).value,
                 "Id": str(uuid.uuid4()),
             }
         ]
@@ -30,7 +30,7 @@ def _target_objects(kind: str, user: User, world: World) -> list[dict]:
         return [
             {
                 "Type": "application",
-                "Name": random.choice(world.identity_event_app_names),
+                "Name": pick(world.identity_event_app_names).value,
                 "Id": str(uuid.uuid4()),
             }
         ]
@@ -45,16 +45,12 @@ def _target_objects(kind: str, user: User, world: World) -> list[dict]:
 
 @register("IdentityEvents")
 def generate(world: World) -> IdentityEvents:
-    user = random.choice(world.users)
-    ip = random.choice(world.ips)
-    ua = random.choice(world.user_agents)
+    user = pick(world.users)
+    ip = pick(world.ips)
+    ua = pick(world.user_agents)
     timestamp = now_utc()
 
-    raw = random.choices(
-        world.identity_raw_actions,
-        weights=[r.weight for r in world.identity_raw_actions],
-        k=1,
-    )[0]
+    raw = pick(world.identity_raw_actions)
     action_type, application, target_kind = raw.action, raw.application, raw.target_kind
     target_objects = _target_objects(target_kind, user, world)
 
