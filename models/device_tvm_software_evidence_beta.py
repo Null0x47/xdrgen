@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 from typing import Optional
 
@@ -5,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceTvmSoftwareEvidenceBeta(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     DeviceId: Optional[str] = Field(None, description="Unique identifier for the device in the service")
     SoftwareVendor: Optional[str] = Field(None, description="Name of the software publisher")
     SoftwareName: Optional[str] = Field(None, description="Name of the software product")

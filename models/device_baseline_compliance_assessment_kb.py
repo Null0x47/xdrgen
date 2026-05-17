@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 from typing import Optional
 
@@ -5,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceBaselineComplianceAssessmentKB(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     ConfigurationId: Optional[str] = Field(None, description="Unique identifier for a specific configuration")
     ConfigurationName: Optional[str] = Field(None, description="Display name of the configuration")
     ConfigurationDescription: Optional[str] = Field(None, description="Description of the configuration")

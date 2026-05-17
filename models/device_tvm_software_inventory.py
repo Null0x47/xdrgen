@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceTvmSoftwareInventory(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     DeviceId: Optional[str] = Field(None, description="Unique identifier for the device in the service")
     DeviceName: Optional[str] = Field(None, description="Fully qualified domain name (FQDN) of the device")
     EndOfSupportDate: Optional[datetime] = Field(None, description="End-of-support (EOS) or end-of-life (EOL) date of the software product")

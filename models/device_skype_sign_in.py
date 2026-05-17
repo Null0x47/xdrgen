@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceSkypeSignIn(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     Computer: Optional[str] = Field(None, description="")
     EventId: Optional[int] = Field(None, description="")
     EventName: Optional[str] = Field(None, description="")

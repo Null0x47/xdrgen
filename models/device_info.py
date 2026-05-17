@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceInfo(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     AadDeviceId: Optional[str] = Field(None, description="Unique identifier for the device in Azure Active Directory.")
     AdditionalFields: Optional[Any] = Field(None, description="Additional information about the entity or event.")
     AssetValue: Optional[str] = Field(None, description="Indicates the value of a device as assigned by the user.")

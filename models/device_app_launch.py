@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceAppLaunch(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     AppID: Optional[str] = Field(None, description="")
     Computer: Optional[str] = Field(None, description="")
     EventId: Optional[int] = Field(None, description="")

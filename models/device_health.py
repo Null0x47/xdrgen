@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceHealth(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     Computer: Optional[str] = Field(None, description="")
     DeviceType: Optional[str] = Field(None, description="")
     EventId: Optional[int] = Field(None, description="")

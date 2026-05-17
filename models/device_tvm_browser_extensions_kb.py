@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 from typing import Optional
 
@@ -5,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceTvmBrowserExtensionsKB(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     BrowserName: Optional[str] = Field(None, description="Name of the web browser with the extension")
     ExtensionId: Optional[str] = Field(None, description="Unique identifier for the browser extension")
     ExtensionName: Optional[str] = Field(None, description="Name of the extension")

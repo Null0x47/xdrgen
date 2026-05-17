@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 from typing import Optional
 
@@ -5,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class DeviceTvmCertificateInfo(BaseModel):
+    Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     DeviceId: Optional[str] = Field(None, description="Unique identifier for the device in the service")
     Thumbprint: Optional[str] = Field(None, description="Unique identifier for the certificate")
     Path: Optional[str] = Field(None, description="The location of the certificate")
