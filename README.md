@@ -110,9 +110,9 @@ The profile is validated by Pydantic models in [`world.py`](./world.py); unknown
 
 **See [`FIXTURES.md`](./FIXTURES.md) for the canonical reference** — every overridable key, what it drives, the item-model shape, and any cross-table constraints. The file also documents the two YAML shapes (bare list = uniform sampling; `{random: false, entries: [...]}` = weighted sampling with a required `weight` per entry).
 
-#### Threat profiles
+#### Threat profile examples
 
-Ready-made profiles that shape the output stream like a specific attack technique live in [`examples/threat-profiles/`](./examples/threat-profiles/):
+Ready-made example profiles that shape the output stream like a specific attack technique live in [`examples/threat-profiles/`](./examples/threat-profiles/):
 
 - [`azure-hound/`](./examples/threat-profiles/azure-hound/) — emits the 14 Microsoft Graph endpoints AzureHound walks during directory collection, sized to trip the [CloudBrothers GraphAPIAuditEvents detection](https://cloudbrothers.info/detect-threats-graphapiauditevents-part-3/).
 - [`axios-npm/`](./examples/threat-profiles/axios-npm/) — replays the post-install dropper command lines from the trojanized `axios@1.14.1` / `axios@0.30.4` packages (via `plain-crypto-js@4.2.1`), shaped to fire the `DeviceProcessEvents` curl-execution query from Microsoft's [Axios npm supply-chain analysis](https://www.microsoft.com/en-us/security/blog/2026/04/01/mitigating-the-axios-npm-supply-chain-compromise/).
