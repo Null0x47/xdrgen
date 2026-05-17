@@ -9,7 +9,7 @@ from world import (
     Overrides,
     Profile,
     User,
-    WeightedErrorCode,
+    ErrorCode,
     WeightedPool,
     World,
 )
@@ -42,8 +42,8 @@ def test_weighted_error_code_overrides_replace_defaults():
         tables=["EntraIdSignInEvents"],
         overrides=Overrides(
             entra_sign_in_error_codes=[
-                WeightedErrorCode(code=0, weight=1),
-                WeightedErrorCode(
+                ErrorCode(code=0, weight=1),
+                ErrorCode(
                     code=50126,
                     weight=99,
                     description="InvalidUserNameOrPassword",
@@ -59,7 +59,7 @@ def test_weighted_error_code_overrides_replace_defaults():
 
 def test_weighted_error_code_rejects_unknown_keys():
     with pytest.raises(ValidationError):
-        WeightedErrorCode.model_validate({"code": 0, "weight": 1, "extra": True})
+        ErrorCode.model_validate({"code": 0, "weight": 1, "extra": True})
 
 
 def test_world_is_frozen():

@@ -311,13 +311,13 @@ def test_entra_id_sign_in_error_codes_drawn_from_world_catalogue(_world):
 
 def test_entra_id_sign_in_error_codes_override_constrains_distribution():
     """Pinning a single error code via YAML constrains every emitted event."""
-    from world import Overrides, Profile, WeightedErrorCode
+    from world import Overrides, Profile, ErrorCode
 
     prof = Profile(
         tables=["EntraIdSignInEvents"],
         overrides=Overrides(
             entra_sign_in_error_codes=[
-                WeightedErrorCode(
+                ErrorCode(
                     code=50126,
                     weight=1,
                     description="InvalidUserNameOrPassword",
@@ -333,12 +333,12 @@ def test_entra_id_sign_in_error_codes_override_constrains_distribution():
 
 
 def test_entra_id_spn_sign_in_error_codes_override_constrains_distribution():
-    from world import Overrides, Profile, WeightedErrorCode
+    from world import Overrides, Profile, ErrorCode
 
     prof = Profile(
         tables=["EntraIdSpnSignInEvents"],
         overrides=Overrides(
-            entra_spn_sign_in_error_codes=[WeightedErrorCode(code=7000222, weight=1)]
+            entra_spn_sign_in_error_codes=[ErrorCode(code=7000222, weight=1)]
         ),
     )
     world = prof.build_world()
@@ -1799,7 +1799,7 @@ def test_identity_query_events_overrides():
 
 def test_url_click_outcomes_override():
     """`url_click_outcomes` and `url_click_workloads` flow into rows."""
-    from world import Overrides, Profile, UrlClickOutcome, WeightedWorkload
+    from world import Overrides, Profile, UrlClickOutcome, Workload
 
     prof = Profile(
         tables=["UrlClickEvents"],
@@ -1811,7 +1811,7 @@ def test_url_click_outcomes_override():
                     weight=1,
                 )
             ],
-            url_click_workloads=[WeightedWorkload(workload="Email", weight=1)],
+            url_click_workloads=[Workload(workload="Email", weight=1)],
         ),
     )
     world = prof.build_world()

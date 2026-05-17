@@ -316,7 +316,7 @@ class CloudApp(BaseModel):
 
 
 class DeviceNetworkActionType(BaseModel):
-    """Weighted DeviceNetworkEvents ActionType."""
+    """DeviceNetworkEvents ActionType pool entry."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -339,7 +339,7 @@ class NetworkAdapter(BaseModel):
 
 
 class DeviceRegistryActionType(BaseModel):
-    """Weighted DeviceRegistryEvents ActionType."""
+    """DeviceRegistryEvents ActionType pool entry."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -364,7 +364,7 @@ class EmailPostDeliveryPath(BaseModel):
 
 
 class GraphApiStatusCode(BaseModel):
-    """Weighted HTTP status feeding GraphApiAuditEvents.ResponseStatusCode."""
+    """HTTP status feeding GraphApiAuditEvents.ResponseStatusCode."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -373,7 +373,7 @@ class GraphApiStatusCode(BaseModel):
 
 
 class IdentityRiskLevel(BaseModel):
-    """Weighted DefenderRiskLevel for IdentityAccountInfo (0=None .. 3=High)."""
+    """DefenderRiskLevel for IdentityAccountInfo (0=None .. 3=High)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -382,7 +382,7 @@ class IdentityRiskLevel(BaseModel):
 
 
 class IdentityDirectoryActionType(BaseModel):
-    """Weighted IdentityDirectoryEvents ActionType."""
+    """IdentityDirectoryEvents ActionType pool entry."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -405,7 +405,7 @@ class IdentityRawAction(BaseModel):
 
 
 class IdentityLogonType(BaseModel):
-    """Weighted LogonType for IdentityLogonEvents."""
+    """LogonType for IdentityLogonEvents."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -414,7 +414,7 @@ class IdentityLogonType(BaseModel):
 
 
 class IdentityLogonProtocol(BaseModel):
-    """Weighted (protocol, port) pair for IdentityLogonEvents.
+    """(protocol, port) pair for IdentityLogonEvents.
 
     Service / Batch logons are routed through Kerberos by the generator
     regardless of weighting."""
@@ -427,7 +427,7 @@ class IdentityLogonProtocol(BaseModel):
 
 
 class IdentityQueryKind(BaseModel):
-    """Weighted (query_type, protocol, port) tuple for IdentityQueryEvents."""
+    """(query_type, protocol, port) tuple for IdentityQueryEvents."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -438,7 +438,7 @@ class IdentityQueryKind(BaseModel):
 
 
 class UrlClickOutcome(BaseModel):
-    """Weighted Safe Links click outcome feeding UrlClickEvents.
+    """Safe Links click outcome feeding UrlClickEvents.
 
     A phish-verdict email always routes to a Block* outcome regardless of
     weighting — that override happens in the generator."""
@@ -451,8 +451,8 @@ class UrlClickOutcome(BaseModel):
     weight: Optional[int] = None
 
 
-class WeightedWorkload(BaseModel):
-    """Weighted source workload feeding UrlClickEvents.Workload."""
+class Workload(BaseModel):
+    """Source workload feeding UrlClickEvents.Workload."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -461,7 +461,7 @@ class WeightedWorkload(BaseModel):
 
 
 class DeviceLogonType(BaseModel):
-    """Weighted LogonType for DeviceLogonEvents.
+    """LogonType for DeviceLogonEvents.
 
     `logon_type` is one of MDE's emitted values (Network, Interactive,
     RemoteInteractive, Service, Batch, Unlock, NetworkCleartext,
@@ -505,7 +505,7 @@ class CodeSigningCertificate(BaseModel):
 
 
 class DeviceEventAction(BaseModel):
-    """Weighted DeviceEvents ActionType + shape selector.
+    """DeviceEvents ActionType + shape selector.
 
     `shape` ∈ {file, network, registry, none} drives which auxiliary
     column block the generated row populates (file fields for AV detections,
@@ -536,7 +536,7 @@ class FileTemplate(BaseModel):
 
 
 class FileActionType(BaseModel):
-    """Weighted DeviceFileEvents ActionType.
+    """DeviceFileEvents ActionType.
 
     `NetworkShare*` actions are routed to UNC `share` templates regardless
     of distribution; other actions land on any template."""
@@ -586,7 +586,7 @@ class ConditionalAccessPolicy(BaseModel):
     weight: Optional[int] = None
 
 
-class WeightedErrorCode(BaseModel):
+class ErrorCode(BaseModel):
     """Entra ID ErrorCode with sampling weight; description (optional) feeds
     AuthenticationProcessingDetails on failures."""
 
@@ -1215,67 +1215,67 @@ _DEFAULT_RESOURCES: tuple[Resource, ...] = (
 
 # Real Entra ErrorCodes; healthy tenant ~80% success.
 # https://learn.microsoft.com/azure/active-directory/develop/reference-error-codes
-_DEFAULT_ENTRA_SIGN_IN_ERROR_CODES: tuple[WeightedErrorCode, ...] = (
-    WeightedErrorCode(code=0, weight=80),
-    WeightedErrorCode(
+_DEFAULT_ENTRA_SIGN_IN_ERROR_CODES: tuple[ErrorCode, ...] = (
+    ErrorCode(code=0, weight=80),
+    ErrorCode(
         code=50126,
         weight=5,
         description="InvalidUserNameOrPassword: Error validating credentials due to invalid username or password.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=50076,
         weight=3,
         description="UserStrongAuthClientAuthNRequired: Multi-factor authentication is required.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=50074,
         weight=2,
         description="UserStrongAuthClientAuthNRequiredInterrupt: Strong authentication is required and the user did not pass the MFA challenge.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=50053,
         weight=1,
         description="IdsLocked: Account is locked because the user tried to sign in too many times with an incorrect user ID or password.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=53003,
         weight=2,
         description="BlockedByConditionalAccess: Access has been blocked by Conditional Access policies.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=53000,
         weight=1,
         description="DeviceNotCompliant: The device used is not compliant with Conditional Access policy.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=50158,
         weight=1,
         description="ExternalSecurityChallengeNotSatisfied: External security challenge was not satisfied.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=50140,
         weight=1,
         description="KeepMeSignedInInterrupt: The user was presented with the Keep Me Signed In (KMSI) interrupt.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=50057, weight=1, description="UserDisabled: The user account is disabled."
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=50055,
         weight=1,
         description="InvalidPasswordExpiredPassword: The password is expired.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=50034,
         weight=1,
         description="UserAccountNotFound: The user account does not exist in the directory.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=50173,
         weight=1,
         description="FreshTokenNeeded: The provided grant has expired due to it being revoked, and a fresh auth token is needed.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=50097,
         weight=1,
         description="DeviceAuthenticationRequired: Device authentication is required.",
@@ -1284,44 +1284,44 @@ _DEFAULT_ENTRA_SIGN_IN_ERROR_CODES: tuple[WeightedErrorCode, ...] = (
 
 
 # SPN sign-ins skew to success; failures are secret/consent issues.
-_DEFAULT_ENTRA_SPN_SIGN_IN_ERROR_CODES: tuple[WeightedErrorCode, ...] = (
-    WeightedErrorCode(code=0, weight=92),
-    WeightedErrorCode(
+_DEFAULT_ENTRA_SPN_SIGN_IN_ERROR_CODES: tuple[ErrorCode, ...] = (
+    ErrorCode(code=0, weight=92),
+    ErrorCode(
         code=7000215,
         weight=2,
         description="InvalidClientSecret: Invalid client secret is provided.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=7000222,
         weight=1,
         description="InvalidClientSecretExpiredKeysProvided: The provided client secret keys are expired.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=700016,
         weight=1,
         description="UnauthorizedClient_DoesNotMatchAuthorizedParty: Application not found in the directory.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=50105,
         weight=1,
         description="EntitlementGrantsNotFound: The signed-in user is not assigned to a role for the application.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=90094,
         weight=1,
         description="AdminConsentRequired: Administrator consent is required for this application.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=65001,
         weight=1,
         description="DelegationDoesNotExist: The user or administrator has not consented to use the application.",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=53003,
         weight=1,
         description="BlockedByConditionalAccess: Access has been blocked by Conditional Access policies (workload identity).",
     ),
-    WeightedErrorCode(
+    ErrorCode(
         code=9002313,
         weight=1,
         description="InvalidGrant: The provided authorization grant has expired or been revoked.",
@@ -2061,7 +2061,7 @@ _DEFAULT_EMAIL_POST_DELIVERY_PATHS: tuple[EmailPostDeliveryPath, ...] = (
 )
 
 
-# Weighted HTTP outcomes feeding GraphApiAuditEvents.ResponseStatusCode.
+# HTTP outcomes feeding GraphApiAuditEvents.ResponseStatusCode.
 _DEFAULT_GRAPH_API_STATUS_CODES: tuple[GraphApiStatusCode, ...] = (
     GraphApiStatusCode(code="200", weight=80),
     GraphApiStatusCode(code="201", weight=4),
@@ -2189,7 +2189,7 @@ _DEFAULT_IDENTITY_EVENT_APP_NAMES: tuple[str, ...] = (
 )
 
 
-# Weighted LogonType + (protocol, port) for IdentityLogonEvents.
+# LogonType + (protocol, port) for IdentityLogonEvents.
 _DEFAULT_IDENTITY_LOGON_TYPES: tuple[IdentityLogonType, ...] = (
     IdentityLogonType(logon_type="Network", weight=50),
     IdentityLogonType(logon_type="Interactive", weight=18),
@@ -2278,10 +2278,10 @@ _DEFAULT_URL_CLICK_OUTCOMES: tuple[UrlClickOutcome, ...] = (
         action_type="PendingDetonationPage", is_clicked_through=True, weight=4
     ),
 )
-_DEFAULT_URL_CLICK_WORKLOADS: tuple[WeightedWorkload, ...] = (
-    WeightedWorkload(workload="Email", weight=75),
-    WeightedWorkload(workload="Office", weight=12),
-    WeightedWorkload(workload="Teams", weight=13),
+_DEFAULT_URL_CLICK_WORKLOADS: tuple[Workload, ...] = (
+    Workload(workload="Email", weight=75),
+    Workload(workload="Office", weight=12),
+    Workload(workload="Teams", weight=13),
 )
 
 
@@ -2747,9 +2747,7 @@ class World(BaseModel):
     url_click_outcomes: WeightedPool[UrlClickOutcome] = _pool(
         _DEFAULT_URL_CLICK_OUTCOMES
     )
-    url_click_workloads: WeightedPool[WeightedWorkload] = _pool(
-        _DEFAULT_URL_CLICK_WORKLOADS
-    )
+    url_click_workloads: WeightedPool[Workload] = _pool(_DEFAULT_URL_CLICK_WORKLOADS)
     file_templates: WeightedPool[FileTemplate] = _pool(_DEFAULT_FILE_TEMPLATES)
     file_action_types: WeightedPool[FileActionType] = _pool(_DEFAULT_FILE_ACTION_TYPES)
     file_sensitivity_labels: WeightedPool[SensitivityLabel] = _pool(
@@ -2761,10 +2759,10 @@ class World(BaseModel):
     conditional_access_policies: WeightedPool[ConditionalAccessPolicy] = _pool(
         _DEFAULT_CA_POLICIES
     )
-    entra_sign_in_error_codes: WeightedPool[WeightedErrorCode] = _pool(
+    entra_sign_in_error_codes: WeightedPool[ErrorCode] = _pool(
         _DEFAULT_ENTRA_SIGN_IN_ERROR_CODES
     )
-    entra_spn_sign_in_error_codes: WeightedPool[WeightedErrorCode] = _pool(
+    entra_spn_sign_in_error_codes: WeightedPool[ErrorCode] = _pool(
         _DEFAULT_ENTRA_SPN_SIGN_IN_ERROR_CODES
     )
     email_templates: WeightedPool[EmailTemplate] = _pool(_DEFAULT_EMAIL_TEMPLATES)
@@ -2841,14 +2839,14 @@ class Overrides(BaseModel):
     identity_query_group_targets: Optional[WeightedPool[ScalarEntry]] = None
     identity_query_computer_targets: Optional[WeightedPool[ScalarEntry]] = None
     url_click_outcomes: Optional[WeightedPool[UrlClickOutcome]] = None
-    url_click_workloads: Optional[WeightedPool[WeightedWorkload]] = None
+    url_click_workloads: Optional[WeightedPool[Workload]] = None
     file_templates: Optional[WeightedPool[FileTemplate]] = None
     file_action_types: Optional[WeightedPool[FileActionType]] = None
     file_sensitivity_labels: Optional[WeightedPool[SensitivityLabel]] = None
     file_download_hosts: Optional[WeightedPool[ScalarEntry]] = None
     conditional_access_policies: Optional[WeightedPool[ConditionalAccessPolicy]] = None
-    entra_sign_in_error_codes: Optional[WeightedPool[WeightedErrorCode]] = None
-    entra_spn_sign_in_error_codes: Optional[WeightedPool[WeightedErrorCode]] = None
+    entra_sign_in_error_codes: Optional[WeightedPool[ErrorCode]] = None
+    entra_spn_sign_in_error_codes: Optional[WeightedPool[ErrorCode]] = None
     email_templates: Optional[WeightedPool[EmailTemplate]] = None
 
     @model_validator(mode="before")
