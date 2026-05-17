@@ -11,21 +11,6 @@ from generators.base import register
 from generators.common import now_utc
 from world import World
 
-# Weighted HTTP outcomes — 2xx dominates; failure tail covers 401/403/404/429.
-_STATUS_CODES: tuple[tuple[str, int], ...] = (
-    ("200", 80),
-    ("201", 4),
-    ("204", 4),
-    ("400", 2),
-    ("401", 2),
-    ("403", 3),
-    ("404", 2),
-    ("429", 2),
-    ("500", 1),
-)
-_STATUS_VALUES, _STATUS_WEIGHTS = zip(*_STATUS_CODES)
-
-
 _PINNED_VERSION_RE = re.compile(r"^/(v1\.0|beta)/")
 
 
@@ -70,7 +55,11 @@ def generate(world: World) -> GraphApiAuditEvents:
     )
     request_uri = f"https://graph.microsoft.com{uri_path}"
 
-    status_code = random.choices(_STATUS_VALUES, weights=_STATUS_WEIGHTS, k=1)[0]
+    status_code = random.choices(
+        [s.code for s in world.graph_api_status_codes],
+        weights=[s.weight for s in world.graph_api_status_codes],
+        k=1,
+    )[0]
     is_success = status_code.startswith("2")
 
     # GETs return larger payloads than writes; 204 = 0; failures = short envelopes.

@@ -64,7 +64,6 @@ from generators.entra_id_spn_sign_in_events import (
     generate as generate_spn,
 )
 from generators.graph_api_audit_events import (
-    _STATUS_VALUES as GRAPH_STATUS_VALUES,
     generate as generate_graph_api,
 )
 from generators.identity_account_info import generate as generate_account_info
@@ -707,7 +706,7 @@ def test_graph_api_audit_events_request_uri_is_well_formed(_world):
 
 
 def test_graph_api_audit_events_status_codes_drawn_from_known_set(_world):
-    valid_status = set(GRAPH_STATUS_VALUES)
+    valid_status = {s.code for s in _world.graph_api_status_codes}
     valid_workloads = {e.workload for e in _world.graph_api_endpoints}
     for _ in range(50):
         event = generate_graph_api(_world)
@@ -1042,6 +1041,38 @@ def test_device_logon_events_failure_reason_only_set_on_failure(_world):
     assert saw_failure, "expected at least one LogonFailed in 500 samples"
 
 
+def test_device_logon_events_honors_profile_overrides():
+    """`device_logon_types`, `device_logon_protocols`, `device_logon_failure_reasons`
+    overrides constrain LogonType, Protocol, and FailureReason."""
+    from world import DeviceLogonType, Overrides, Profile
+
+    prof = Profile(
+        tables=["DeviceLogonEvents"],
+        overrides=Overrides(
+            device_logon_types=[
+                DeviceLogonType(logon_type="Service", weight=1),
+                DeviceLogonType(logon_type="Batch", weight=1),
+            ],
+            device_logon_protocols=["Kerberos"],
+            device_logon_failure_reasons=["NorthwindCustomDenial"],
+        ),
+    )
+    world = prof.build_world()
+
+    seen_logon = set()
+    saw_failure = False
+    for _ in range(500):
+        event = generate_device_logon(world)
+        assert event.LogonType in {"Service", "Batch"}
+        assert event.Protocol == "Kerberos"
+        seen_logon.add(event.LogonType)
+        if event.ActionType == "LogonFailed":
+            saw_failure = True
+            assert event.FailureReason == "NorthwindCustomDenial"
+    assert seen_logon == {"Service", "Batch"}
+    assert saw_failure, "expected at least one LogonFailed in 500 samples"
+
+
 def test_device_network_events_round_trips_through_model(_world):
     event = generate_device_network(_world)
 
@@ -1073,6 +1104,30 @@ def test_device_image_load_events_round_trips_through_model(_world):
 
     assert isinstance(event, DeviceImageLoadEvents)
     DeviceImageLoadEvents.model_validate_json(event.model_dump_json(by_alias=True))
+
+
+def test_device_image_load_events_honors_loaded_libraries_override():
+    """`loaded_libraries` override fully replaces the default DLL pool."""
+    from world import LoadedLibrary, Overrides, Profile
+
+    prof = Profile(
+        tables=["DeviceImageLoadEvents"],
+        overrides=Overrides(
+            loaded_libraries=[
+                LoadedLibrary(
+                    file_name="northwind-agent.dll",
+                    folder_path=r"C:\Program Files\Northwind\bin",
+                )
+            ]
+        ),
+    )
+    world = prof.build_world()
+    for _ in range(50):
+        event = generate_device_image_load(world)
+        assert event.FileName == "northwind-agent.dll"
+        assert event.FolderPath == (
+            r"C:\Program Files\Northwind\bin\northwind-agent.dll"
+        )
 
 
 def test_device_registry_events_round_trips_through_model(_world):
@@ -1142,6 +1197,47 @@ def test_device_events_round_trips_through_model(_world):
 
     assert isinstance(event, DeviceEvents)
     DeviceEvents.model_validate_json(event.model_dump_json(by_alias=True))
+
+
+def test_device_events_honors_action_pool_override():
+    """`device_event_actions` override constrains ActionType + drives shape:
+    a `file`-shape action populates file fields, `network`-shape doesn't."""
+    from world import DeviceEventAction, Overrides, Profile
+
+    prof = Profile(
+        tables=["DeviceEvents"],
+        overrides=Overrides(
+            device_event_actions=[
+                DeviceEventAction(
+                    action="NorthwindCustomFileDetection",
+                    shape="file",
+                    weight=1,
+                ),
+                DeviceEventAction(
+                    action="NorthwindCustomNetworkBlock",
+                    shape="network",
+                    weight=1,
+                ),
+            ]
+        ),
+    )
+    world = prof.build_world()
+
+    seen = set()
+    for _ in range(200):
+        event = generate_device_events(world)
+        seen.add(event.ActionType)
+        assert event.ActionType in {
+            "NorthwindCustomFileDetection",
+            "NorthwindCustomNetworkBlock",
+        }
+        if event.ActionType == "NorthwindCustomFileDetection":
+            assert event.FileName is not None
+            assert event.RemoteIP is None
+        else:
+            assert event.RemoteIP is not None
+            assert event.FileName is None
+    assert seen == {"NorthwindCustomFileDetection", "NorthwindCustomNetworkBlock"}
 
 
 def test_device_file_events_round_trips_through_model(_world):
@@ -1270,6 +1366,48 @@ def test_device_file_certificate_info_unsigned_files_have_no_cert_fields(_world)
     assert saw_unsigned, "expected at least one unsigned row in 500 samples"
 
 
+def test_device_file_certificate_info_honors_profile_overrides():
+    """`code_signing_certificates`, `signed_files`, `crl_urls` overrides flow
+    into emitted rows; SHA1 is derived from the picked signed_files entry."""
+    from world import CodeSigningCertificate, Overrides, Profile
+    from generators.device_common import hashes_for as _hashes_for
+
+    prof = Profile(
+        tables=["DeviceFileCertificateInfo"],
+        overrides=Overrides(
+            code_signing_certificates=[
+                CodeSigningCertificate(
+                    subject="Northwind Lab CA",
+                    issuer="Northwind Lab Root",
+                    serial="DEADBEEF00112233",
+                    is_root_microsoft=False,
+                    signature_type="Catalog",
+                )
+            ],
+            signed_files=["lab-runner.exe"],
+            crl_urls=["http://crl.lab.northwind.test/root.crl"],
+        ),
+    )
+    world = prof.build_world()
+    expected_sha1 = _hashes_for("lab-runner.exe")[1]
+
+    saw_signed = False
+    for _ in range(200):
+        event = generate_device_cert(world)
+        assert event.SHA1 == expected_sha1
+        if event.IsSigned:
+            saw_signed = True
+            assert event.Signer == "Northwind Lab CA"
+            assert event.Issuer == "Northwind Lab Root"
+            assert event.CertificateSerialNumber == "DEADBEEF00112233"
+            assert event.SignatureType == "Catalog"
+            assert event.IsRootSignerMicrosoft is False
+            assert event.CrlDistributionPointUrls == (
+                "http://crl.lab.northwind.test/root.crl"
+            )
+    assert saw_signed, "expected at least one signed row in 200 samples"
+
+
 def test_device_network_info_round_trips_through_model(_world):
     event = generate_device_network_info(_world)
 
@@ -1375,3 +1513,311 @@ def test_every_registered_generator_produces_a_valid_event(table, _world):
     event = GENERATORS[table](_world)
     payload = event.model_dump_json(by_alias=True)
     type(event).model_validate_json(payload)
+
+
+def test_cloud_app_events_honors_profile_overrides():
+    """`cloud_apps`, `cloud_app_file_names`, `cloud_app_mail_subjects`,
+    `cloud_app_group_names` overrides flow into emitted rows."""
+    from world import CloudApp, Overrides, Profile
+
+    prof = Profile(
+        tables=["CloudAppEvents"],
+        overrides=Overrides(
+            cloud_apps=[
+                CloudApp(
+                    name="NorthwindLOB",
+                    app_id=99999,
+                    instance_id=8888,
+                    audit_source="Northwind",
+                    actions=("FileDownloaded", "MailSent"),
+                )
+            ],
+            cloud_app_file_names=["only-file.csv"],
+            cloud_app_mail_subjects=["only-subject"],
+        ),
+    )
+    world = prof.build_world()
+    seen_actions = set()
+    for _ in range(100):
+        event = generate_cae(world)
+        assert event.Application == "NorthwindLOB"
+        assert event.ApplicationId == 99999
+        assert event.AppInstanceId == 8888
+        assert event.AuditSource == "Northwind"
+        assert event.ActionType in {"FileDownloaded", "MailSent"}
+        seen_actions.add(event.ActionType)
+        if event.ObjectType == "File":
+            assert event.ObjectName == "only-file.csv"
+        if event.ObjectType == "Email":
+            assert event.ObjectName == "only-subject"
+    assert seen_actions == {"FileDownloaded", "MailSent"}
+
+
+def test_device_network_events_honors_action_types_override():
+    """`device_network_action_types` override constrains ActionType."""
+    from world import DeviceNetworkActionType, Overrides, Profile
+
+    prof = Profile(
+        tables=["DeviceNetworkEvents"],
+        overrides=Overrides(
+            device_network_action_types=[
+                DeviceNetworkActionType(action="NorthwindBeacon", weight=1)
+            ]
+        ),
+    )
+    world = prof.build_world()
+    for _ in range(50):
+        event = generate_device_network(world)
+        assert event.ActionType == "NorthwindBeacon"
+
+
+def test_device_network_info_honors_overrides():
+    """`network_adapters`, `local_dns_servers`, `local_default_gateways` flow through."""
+    import json
+
+    from world import NetworkAdapter, Overrides, Profile
+
+    prof = Profile(
+        tables=["DeviceNetworkInfo"],
+        overrides=Overrides(
+            network_adapters=[
+                NetworkAdapter(
+                    name="northwind-vpn0",
+                    type="Tunnel",
+                    vendor="Northwind Labs",
+                    tunnel="Wireguard",
+                    network_category="Private",
+                    network_name="nw-corp",
+                )
+            ],
+            local_dns_servers=["10.99.0.1", "10.99.0.2"],
+            local_default_gateways=["10.99.0.254"],
+        ),
+    )
+    world = prof.build_world()
+    for _ in range(50):
+        event = generate_device_network_info(world)
+        assert event.NetworkAdapterName == "northwind-vpn0"
+        assert event.NetworkAdapterVendor == "Northwind Labs"
+        assert event.TunnelType == "Wireguard"
+        assert event.IPv4Dhcp == "10.99.0.254"
+        assert json.loads(event.DefaultGateways) == ["10.99.0.254"]
+        for dns in json.loads(event.DnsAddresses):
+            assert dns in {"10.99.0.1", "10.99.0.2"}
+
+
+def test_device_registry_events_honors_action_types_override():
+    """`device_registry_action_types` override constrains ActionType."""
+    from world import DeviceRegistryActionType, Overrides, Profile
+
+    prof = Profile(
+        tables=["DeviceRegistryEvents"],
+        overrides=Overrides(
+            device_registry_action_types=[
+                DeviceRegistryActionType(action="RegistryValueSet", weight=1)
+            ]
+        ),
+    )
+    world = prof.build_world()
+    for _ in range(50):
+        event = generate_device_registry(world)
+        assert event.ActionType == "RegistryValueSet"
+
+
+def test_email_post_delivery_paths_override():
+    """`email_post_delivery_paths` constrains Action / Trigger / DeliveryLocation
+    on non-phish mail. (Phish-mail filtering still requires ZAP/Admin paths,
+    so the test pins a ZAP path so phish rows can still pick it.)"""
+    from world import EmailPostDeliveryPath, Overrides, Profile
+
+    prof = Profile(
+        tables=["EmailPostDeliveryEvents"],
+        overrides=Overrides(
+            email_post_delivery_paths=[
+                EmailPostDeliveryPath(
+                    action="Northwind ZAP",
+                    action_type="Phish ZAP",
+                    trigger="ZAP",
+                    result="Success",
+                    delivery_location="Quarantine",
+                )
+            ]
+        ),
+    )
+    world = prof.build_world()
+    for _ in range(50):
+        event = generate_email_post_delivery(world)
+        assert event.Action == "Northwind ZAP"
+        assert event.ActionTrigger == "ZAP"
+        assert event.DeliveryLocation == "Quarantine"
+
+
+def test_graph_api_status_codes_override_constrains_distribution():
+    """`graph_api_status_codes` override constrains ResponseStatusCode."""
+    from world import GraphApiStatusCode, Overrides, Profile
+
+    prof = Profile(
+        tables=["GraphApiAuditEvents"],
+        overrides=Overrides(
+            graph_api_status_codes=[GraphApiStatusCode(code="418", weight=1)]
+        ),
+    )
+    world = prof.build_world()
+    for _ in range(100):
+        event = generate_graph_api(world)
+        assert event.ResponseStatusCode == "418"
+
+
+def test_identity_account_info_honors_auth_method_and_risk_overrides():
+    """`identity_auth_methods` and `identity_risk_levels` constrain the row."""
+    from world import IdentityRiskLevel, Overrides, Profile
+
+    prof = Profile(
+        tables=["IdentityAccountInfo"],
+        overrides=Overrides(
+            identity_auth_methods=["NorthwindFedAuth"],
+            identity_risk_levels=[IdentityRiskLevel(level=3, weight=1)],
+        ),
+    )
+    world = prof.build_world()
+    for _ in range(50):
+        event = generate_account_info(world)
+        assert event.AuthenticationMethod == "NorthwindFedAuth"
+        assert event.DefenderRiskLevel == 3
+
+
+def test_identity_directory_action_types_override():
+    """`identity_directory_action_types` override constrains ActionType."""
+    from world import IdentityDirectoryActionType, Overrides, Profile
+
+    prof = Profile(
+        tables=["IdentityDirectoryEvents"],
+        overrides=Overrides(
+            identity_directory_action_types=[
+                IdentityDirectoryActionType(
+                    action="Northwind custom directory event", weight=1
+                )
+            ]
+        ),
+    )
+    world = prof.build_world()
+    for _ in range(50):
+        event = generate_directory(world)
+        assert event.ActionType == "Northwind custom directory event"
+
+
+def test_identity_events_raw_actions_override():
+    """`identity_raw_actions` constrains ActionType + Application + target shape."""
+    from world import IdentityRawAction, Overrides, Profile
+
+    prof = Profile(
+        tables=["IdentityEvents"],
+        overrides=Overrides(
+            identity_raw_actions=[
+                IdentityRawAction(
+                    action="northwind.user.login",
+                    application="NorthwindIDP",
+                    target_kind="user",
+                    weight=1,
+                )
+            ],
+            identity_event_group_names=["NorthwindOnly"],
+            identity_event_app_names=["NorthwindLOB"],
+        ),
+    )
+    world = prof.build_world()
+    for _ in range(50):
+        event = generate_identity(world)
+        assert event.ActionType == "northwind.user.login"
+        assert event.Application == "NorthwindIDP"
+
+
+def test_identity_logon_events_overrides():
+    """LogonType / Protocol / FailureReason all flow from world."""
+    from world import (
+        IdentityLogonProtocol,
+        IdentityLogonType,
+        Overrides,
+        Profile,
+    )
+
+    prof = Profile(
+        tables=["IdentityLogonEvents"],
+        overrides=Overrides(
+            identity_logon_types=[
+                IdentityLogonType(logon_type="Interactive", weight=1)
+            ],
+            identity_logon_protocols=[
+                IdentityLogonProtocol(protocol="NorthwindAuth", port=4444, weight=1)
+            ],
+            identity_logon_failure_reasons=["NorthwindCustomDenial"],
+        ),
+    )
+    world = prof.build_world()
+    saw_failure = False
+    for _ in range(500):
+        event = generate_logon(world)
+        assert event.LogonType == "Interactive"
+        assert event.Protocol == "NorthwindAuth"
+        assert event.DestinationPort == "4444"
+        if event.ActionType == "LogonFailed":
+            saw_failure = True
+            assert event.FailureReason == "NorthwindCustomDenial"
+    assert saw_failure, "expected at least one LogonFailed in 500 samples"
+
+
+def test_identity_query_events_overrides():
+    """`identity_query_kinds` constrains QueryType + Protocol + DestinationPort,
+    and the group/computer target pools surface in QueryTarget."""
+    from world import IdentityQueryKind, Overrides, Profile
+
+    prof = Profile(
+        tables=["IdentityQueryEvents"],
+        overrides=Overrides(
+            identity_query_kinds=[
+                IdentityQueryKind(
+                    query_type="QueryGroup", protocol="Ldap", port=389, weight=1
+                ),
+                IdentityQueryKind(
+                    query_type="QueryComputer", protocol="Ldap", port=389, weight=1
+                ),
+            ],
+            identity_query_group_targets=["northwind-only-group"],
+            identity_query_computer_targets=["NW-FS-01"],
+        ),
+    )
+    world = prof.build_world()
+    seen_targets = set()
+    for _ in range(200):
+        event = generate_query(world)
+        assert event.QueryType in {"QueryGroup", "QueryComputer"}
+        seen_targets.add(event.QueryTarget)
+    assert seen_targets <= {"northwind-only-group", "NW-FS-01"}
+    assert "northwind-only-group" in seen_targets
+    assert "NW-FS-01" in seen_targets
+
+
+def test_url_click_outcomes_override():
+    """`url_click_outcomes` and `url_click_workloads` flow into rows."""
+    from world import Overrides, Profile, UrlClickOutcome, WeightedWorkload
+
+    prof = Profile(
+        tables=["UrlClickEvents"],
+        overrides=Overrides(
+            url_click_outcomes=[
+                UrlClickOutcome(
+                    action_type="NorthwindAllow",
+                    is_clicked_through=True,
+                    weight=1,
+                )
+            ],
+            url_click_workloads=[WeightedWorkload(workload="Email", weight=1)],
+        ),
+    )
+    world = prof.build_world()
+    # Many runs — but some rows will be phish (forced block path), which falls
+    # back to the only available outcome; that's fine.
+    for _ in range(100):
+        event = generate_url_click(world)
+        assert event.ActionType == "NorthwindAllow"
+        assert event.Workload == "Email"

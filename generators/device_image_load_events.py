@@ -13,34 +13,14 @@ from generators.device_common import (
 from models import DeviceImageLoadEvents
 from world import World
 
-# (dll, folder) — keeps FolderPath consistent with the file name.
-_LIBRARIES = [
-    ("kernel32.dll", r"C:\Windows\System32"),
-    ("ntdll.dll", r"C:\Windows\System32"),
-    ("user32.dll", r"C:\Windows\System32"),
-    ("advapi32.dll", r"C:\Windows\System32"),
-    ("ws2_32.dll", r"C:\Windows\System32"),
-    ("crypt32.dll", r"C:\Windows\System32"),
-    ("ole32.dll", r"C:\Windows\System32"),
-    ("shell32.dll", r"C:\Windows\System32"),
-    ("rpcrt4.dll", r"C:\Windows\System32"),
-    ("msvcrt.dll", r"C:\Windows\System32"),
-    ("amsi.dll", r"C:\Windows\System32"),
-    ("wininet.dll", r"C:\Windows\System32"),
-    ("urlmon.dll", r"C:\Windows\System32"),
-    (
-        "System.Management.Automation.dll",
-        r"C:\Windows\assembly\NativeImages_v4.0.30319_64",
-    ),
-]
-
 
 @register("DeviceImageLoadEvents")
 def generate(world: World) -> DeviceImageLoadEvents:
     device = pick_device(world)
     user = pick_user_for_device(world, device)
 
-    file_name, folder_path = random.choice(_LIBRARIES)
+    library = random.choice(world.loaded_libraries)
+    file_name, folder_path = library.file_name, library.folder_path
     md5, sha1, sha256 = hashes_for(file_name)
 
     return DeviceImageLoadEvents(

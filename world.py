@@ -162,6 +162,221 @@ class RegistryTarget(BaseModel):
     value_type: str  # REG_SZ | REG_DWORD | REG_BINARY | …
 
 
+class CloudApp(BaseModel):
+    """One Defender for Cloud Apps connector feeding CloudAppEvents.
+
+    `app_id` / `instance_id` are real DfCA values; `actions` is the
+    connector-specific vocabulary the row's ActionType is drawn from."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str
+    app_id: int
+    instance_id: int
+    audit_source: str
+    actions: tuple[str, ...]
+
+
+class DeviceNetworkActionType(BaseModel):
+    """Weighted DeviceNetworkEvents ActionType."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    action: str
+    weight: int = 1
+
+
+class NetworkAdapter(BaseModel):
+    """One DeviceNetworkInfo adapter — Wi-Fi, wired LAN, VPN tunnel, etc."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str
+    type: str  # Wireless | Ethernet | Tunnel
+    vendor: str
+    tunnel: Optional[str] = None  # Ssh | Ipsec | None
+    network_category: str  # Private | Public | Domain
+    network_name: str
+
+
+class DeviceRegistryActionType(BaseModel):
+    """Weighted DeviceRegistryEvents ActionType."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    action: str
+    weight: int = 1
+
+
+class EmailPostDeliveryPath(BaseModel):
+    """One ZAP / manual / user-reported path feeding EmailPostDeliveryEvents.
+
+    Phish-verdict emails are constrained to ZAP / Admin triggers; user
+    reclassifications fire only against clean mail."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    action: str
+    action_type: str
+    trigger: str  # ZAP | Admin | User
+    result: str
+    delivery_location: str
+
+
+class GraphApiStatusCode(BaseModel):
+    """Weighted HTTP status feeding GraphApiAuditEvents.ResponseStatusCode."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    code: str
+    weight: int = 1
+
+
+class IdentityRiskLevel(BaseModel):
+    """Weighted DefenderRiskLevel for IdentityAccountInfo (0=None .. 3=High)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    level: int
+    weight: int = 1
+
+
+class IdentityDirectoryActionType(BaseModel):
+    """Weighted IdentityDirectoryEvents ActionType."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    action: str
+    weight: int = 1
+
+
+class IdentityRawAction(BaseModel):
+    """One raw source-side action feeding IdentityEvents.
+
+    `application` is the source system (`AzureActiveDirectory`, `Okta`);
+    `target_kind` ∈ {user, group, app, policy} drives TargetObjects shape."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    action: str
+    application: str
+    target_kind: str
+    weight: int = 1
+
+
+class IdentityLogonType(BaseModel):
+    """Weighted LogonType for IdentityLogonEvents."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    logon_type: str
+    weight: int = 1
+
+
+class IdentityLogonProtocol(BaseModel):
+    """Weighted (protocol, port) pair for IdentityLogonEvents.
+
+    Service / Batch logons are routed through Kerberos by the generator
+    regardless of weighting."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    protocol: str
+    port: int
+    weight: int = 1
+
+
+class IdentityQueryKind(BaseModel):
+    """Weighted (query_type, protocol, port) tuple for IdentityQueryEvents."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    query_type: str
+    protocol: str  # Ldap | Samr | Dns
+    port: int
+    weight: int = 1
+
+
+class UrlClickOutcome(BaseModel):
+    """Weighted Safe Links click outcome feeding UrlClickEvents.
+
+    A phish-verdict email always routes to a Block* outcome regardless of
+    weighting — that override happens in the generator."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    action_type: str
+    is_clicked_through: bool
+    threat_types: Optional[str] = None
+    weight: int = 1
+
+
+class WeightedWorkload(BaseModel):
+    """Weighted source workload feeding UrlClickEvents.Workload."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workload: str
+    weight: int = 1
+
+
+class DeviceLogonType(BaseModel):
+    """Weighted LogonType for DeviceLogonEvents.
+
+    `logon_type` is one of MDE's emitted values (Network, Interactive,
+    RemoteInteractive, Service, Batch, Unlock, NetworkCleartext,
+    CachedInteractive); `weight` controls sampling probability."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    logon_type: str
+    weight: int = 1
+
+
+class LoadedLibrary(BaseModel):
+    """DLL / managed assembly feeding DeviceImageLoadEvents.
+
+    `folder_path` is the directory the library lives in; the generator
+    concatenates it with `file_name` to render `FolderPath`. Hashes are
+    derived deterministically from `file_name` so cross-table pivots
+    against other Device* tables agree."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    file_name: str
+    folder_path: str
+
+
+class CodeSigningCertificate(BaseModel):
+    """Code-signing cert feeding DeviceFileCertificateInfo.
+
+    `is_root_microsoft` drives `IsRootSignerMicrosoft`; `signature_type`
+    matches MDE's column values (`Embedded`, `Catalog`, `None`)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    subject: str
+    issuer: str
+    serial: str
+    is_root_microsoft: bool = False
+    signature_type: str = "Embedded"
+
+
+class DeviceEventAction(BaseModel):
+    """Weighted DeviceEvents ActionType + shape selector.
+
+    `shape` ∈ {file, network, registry, none} drives which auxiliary
+    column block the generated row populates (file fields for AV detections,
+    network fields for Network Protection / browser launches, registry
+    fields for tampering attempts, none for self-contained events)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    action: str
+    shape: str  # file | network | registry | none
+    weight: int = 1
+
+
 class FileTemplate(BaseModel):
     """One file template feeding DeviceFileEvents.
 
@@ -1457,6 +1672,631 @@ _DEFAULT_REGISTRY_TARGETS: tuple[RegistryTarget, ...] = (
 )
 
 
+# Defender for Cloud Apps connectors feeding CloudAppEvents.
+_DEFAULT_CLOUD_APPS: tuple[CloudApp, ...] = (
+    CloudApp(
+        name="Microsoft 365",
+        app_id=11161,
+        instance_id=1001,
+        audit_source="Office 365",
+        actions=(
+            "FileAccessed",
+            "FileDownloaded",
+            "FileUploaded",
+            "FileModified",
+            "FileDeleted",
+            "FileSyncDownloadedFull",
+            "FileSyncUploadedFull",
+            "SharingSet",
+            "AnonymousLinkCreated",
+        ),
+    ),
+    CloudApp(
+        name="Microsoft Exchange Online",
+        app_id=20893,
+        instance_id=1002,
+        audit_source="Office 365",
+        actions=(
+            "MailItemsAccessed",
+            "Send",
+            "Update",
+            "MoveToDeletedItems",
+            "SoftDelete",
+            "HardDelete",
+            "New-InboxRule",
+            "Set-Mailbox",
+        ),
+    ),
+    CloudApp(
+        name="Microsoft Teams",
+        app_id=28375,
+        instance_id=1003,
+        audit_source="Office 365",
+        actions=(
+            "MessageSent",
+            "MemberAdded",
+            "MemberRemoved",
+            "TeamCreated",
+            "ChannelAdded",
+            "MeetingDetail",
+        ),
+    ),
+    CloudApp(
+        name="Salesforce",
+        app_id=11114,
+        instance_id=1004,
+        audit_source="Salesforce",
+        actions=(
+            "Login",
+            "Logout",
+            "ReportRun",
+            "RecordExported",
+            "ApiCall",
+            "PasswordChange",
+        ),
+    ),
+    CloudApp(
+        name="Box",
+        app_id=10489,
+        instance_id=1005,
+        audit_source="Box",
+        actions=(
+            "FILE_PREVIEW",
+            "DOWNLOAD",
+            "UPLOAD",
+            "DELETE",
+            "SHARE",
+            "COLLABORATION_INVITE",
+        ),
+    ),
+    CloudApp(
+        name="GitHub",
+        app_id=15760,
+        instance_id=1006,
+        audit_source="GitHub",
+        actions=(
+            "git.clone",
+            "git.push",
+            "repo.access",
+            "repo.create",
+            "oauth_authorization.create",
+            "personal_access_token.create",
+        ),
+    ),
+)
+
+
+# Filenames feeding CloudAppEvents.ObjectName for File-shaped actions.
+_DEFAULT_CLOUD_APP_FILE_NAMES: tuple[str, ...] = (
+    "Q3_forecast.xlsx",
+    "design-spec.docx",
+    "customer_list.csv",
+    "demo-deck.pptx",
+    "build_logs.txt",
+    "release-notes.md",
+    "contract_v3.pdf",
+    "audit_export.zip",
+)
+
+
+# Mail subjects feeding CloudAppEvents.ObjectName for Email-shaped actions.
+_DEFAULT_CLOUD_APP_MAIL_SUBJECTS: tuple[str, ...] = (
+    "Re: Q3 numbers",
+    "FW: NDA draft",
+    "Weekly status",
+    "Action required: account review",
+    "Calendar invite: planning sync",
+)
+
+
+# Group names feeding CloudAppEvents.ActivityObjects for Group-shaped actions.
+_DEFAULT_CLOUD_APP_GROUP_NAMES: tuple[str, ...] = (
+    "Engineering",
+    "Finance",
+    "Sales-EMEA",
+    "All Hands",
+)
+
+
+# DeviceNetworkEvents ActionType distribution — outbound success dominates.
+_DEFAULT_DEVICE_NETWORK_ACTIONS: tuple[DeviceNetworkActionType, ...] = (
+    DeviceNetworkActionType(action="ConnectionSuccess", weight=60),
+    DeviceNetworkActionType(action="ConnectionFailed", weight=8),
+    DeviceNetworkActionType(action="ConnectionAttempt", weight=6),
+    DeviceNetworkActionType(action="ConnectionRequest", weight=4),
+    DeviceNetworkActionType(action="InboundConnectionAccepted", weight=6),
+    DeviceNetworkActionType(action="ListeningConnectionCreated", weight=4),
+    DeviceNetworkActionType(action="DnsConnectionInspected", weight=8),
+    DeviceNetworkActionType(action="ConnectionFound", weight=4),
+)
+
+
+# Network adapters feeding DeviceNetworkInfo.
+_DEFAULT_NETWORK_ADAPTERS: tuple[NetworkAdapter, ...] = (
+    NetworkAdapter(
+        name="Wi-Fi",
+        type="Wireless",
+        vendor="Intel Corporation",
+        tunnel=None,
+        network_category="Private",
+        network_name="CONTOSO-CORP",
+    ),
+    NetworkAdapter(
+        name="Ethernet",
+        type="Ethernet",
+        vendor="Realtek Semiconductor",
+        tunnel=None,
+        network_category="Domain",
+        network_name="contoso.local",
+    ),
+    NetworkAdapter(
+        name="vEthernet (WSL)",
+        type="Ethernet",
+        vendor="Microsoft Corporation",
+        tunnel=None,
+        network_category="Private",
+        network_name="WSL Internal",
+    ),
+    NetworkAdapter(
+        name="Cisco AnyConnect VPN",
+        type="Tunnel",
+        vendor="Cisco Systems, Inc.",
+        tunnel="Ssh",
+        network_category="Domain",
+        network_name="contoso-vpn",
+    ),
+)
+
+
+# DNS resolvers + default gateways feeding DeviceNetworkInfo.
+_DEFAULT_LOCAL_DNS_SERVERS: tuple[str, ...] = (
+    "10.0.0.10",
+    "10.0.0.11",
+    "8.8.8.8",
+    "1.1.1.1",
+)
+_DEFAULT_LOCAL_DEFAULT_GATEWAYS: tuple[str, ...] = (
+    "10.10.20.1",
+    "10.10.30.1",
+    "10.10.40.1",
+)
+
+
+# DeviceRegistryEvents ActionType distribution.
+_DEFAULT_DEVICE_REGISTRY_ACTIONS: tuple[DeviceRegistryActionType, ...] = (
+    DeviceRegistryActionType(action="RegistryValueSet", weight=60),
+    DeviceRegistryActionType(action="RegistryKeyCreated", weight=12),
+    DeviceRegistryActionType(action="RegistryValueDeleted", weight=10),
+    DeviceRegistryActionType(action="RegistryKeyDeleted", weight=8),
+    DeviceRegistryActionType(action="RegistryKeyRenamed", weight=4),
+    DeviceRegistryActionType(action="RegistryValueRenamed", weight=4),
+    DeviceRegistryActionType(action="RegistryKeyAndValueDeleted", weight=2),
+)
+
+
+# Post-delivery paths feeding EmailPostDeliveryEvents.
+_DEFAULT_EMAIL_POST_DELIVERY_PATHS: tuple[EmailPostDeliveryPath, ...] = (
+    EmailPostDeliveryPath(
+        action="Move to junk",
+        action_type="Phish ZAP",
+        trigger="ZAP",
+        result="Success",
+        delivery_location="JunkFolder",
+    ),
+    EmailPostDeliveryPath(
+        action="Move to quarantine",
+        action_type="Phish ZAP",
+        trigger="ZAP",
+        result="Success",
+        delivery_location="Quarantine",
+    ),
+    EmailPostDeliveryPath(
+        action="Soft delete",
+        action_type="Manual remediation",
+        trigger="Admin",
+        result="Success",
+        delivery_location="Deleted Items",
+    ),
+    EmailPostDeliveryPath(
+        action="Hard delete",
+        action_type="Manual remediation",
+        trigger="Admin",
+        result="Success",
+        delivery_location="Deleted Items",
+    ),
+    EmailPostDeliveryPath(
+        action="Move to inbox",
+        action_type="User reported not junk",
+        trigger="User",
+        result="Success",
+        delivery_location="Inbox",
+    ),
+)
+
+
+# Weighted HTTP outcomes feeding GraphApiAuditEvents.ResponseStatusCode.
+_DEFAULT_GRAPH_API_STATUS_CODES: tuple[GraphApiStatusCode, ...] = (
+    GraphApiStatusCode(code="200", weight=80),
+    GraphApiStatusCode(code="201", weight=4),
+    GraphApiStatusCode(code="204", weight=4),
+    GraphApiStatusCode(code="400", weight=2),
+    GraphApiStatusCode(code="401", weight=2),
+    GraphApiStatusCode(code="403", weight=3),
+    GraphApiStatusCode(code="404", weight=2),
+    GraphApiStatusCode(code="429", weight=2),
+    GraphApiStatusCode(code="500", weight=1),
+)
+
+
+# IdentityAccountInfo authentication methods + Defender risk level distribution.
+_DEFAULT_IDENTITY_AUTH_METHODS: tuple[str, ...] = ("Credentials", "Federated", "Hybrid")
+_DEFAULT_IDENTITY_RISK_LEVELS: tuple[IdentityRiskLevel, ...] = (
+    IdentityRiskLevel(level=0, weight=80),
+    IdentityRiskLevel(level=1, weight=12),
+    IdentityRiskLevel(level=2, weight=6),
+    IdentityRiskLevel(level=3, weight=2),
+)
+
+
+# IdentityDirectoryEvents ActionType — group/password churn dominates.
+_DEFAULT_IDENTITY_DIRECTORY_ACTIONS: tuple[IdentityDirectoryActionType, ...] = (
+    IdentityDirectoryActionType(action="Group Membership changed", weight=32),
+    IdentityDirectoryActionType(action="Account Password changed", weight=22),
+    IdentityDirectoryActionType(action="Account enabled", weight=8),
+    IdentityDirectoryActionType(action="Account disabled", weight=6),
+    IdentityDirectoryActionType(action="Group created", weight=4),
+    IdentityDirectoryActionType(action="Group deleted", weight=2),
+    IdentityDirectoryActionType(action="User created", weight=4),
+    IdentityDirectoryActionType(action="User deleted", weight=2),
+    IdentityDirectoryActionType(action="Account name changed", weight=3),
+    IdentityDirectoryActionType(action="Account display name changed", weight=5),
+    IdentityDirectoryActionType(
+        action="Domain controller authentication policy changed", weight=1
+    ),
+    IdentityDirectoryActionType(
+        action="Account Constrained Delegation state changed", weight=1
+    ),
+    IdentityDirectoryActionType(
+        action="Account Unconstrained Delegation state changed", weight=1
+    ),
+    IdentityDirectoryActionType(action="Account Sensitive flag changed", weight=2),
+    IdentityDirectoryActionType(
+        action="Service Principal Name added to account", weight=4
+    ),
+    IdentityDirectoryActionType(
+        action="Service Principal Name removed from account", weight=3
+    ),
+)
+
+
+# Raw IdentityEvents actions — source-side strings, not normalised.
+_DEFAULT_IDENTITY_RAW_ACTIONS: tuple[IdentityRawAction, ...] = (
+    IdentityRawAction(
+        action="UserLoggedIn", application="AzureActiveDirectory", target_kind="user"
+    ),
+    IdentityRawAction(
+        action="UserLoginFailed", application="AzureActiveDirectory", target_kind="user"
+    ),
+    IdentityRawAction(
+        action="Add user.", application="AzureActiveDirectory", target_kind="user"
+    ),
+    IdentityRawAction(
+        action="Delete user.", application="AzureActiveDirectory", target_kind="user"
+    ),
+    IdentityRawAction(
+        action="Update user.", application="AzureActiveDirectory", target_kind="user"
+    ),
+    IdentityRawAction(
+        action="Add member to group.",
+        application="AzureActiveDirectory",
+        target_kind="group",
+    ),
+    IdentityRawAction(
+        action="Remove member from group.",
+        application="AzureActiveDirectory",
+        target_kind="group",
+    ),
+    IdentityRawAction(
+        action="Reset user password.",
+        application="AzureActiveDirectory",
+        target_kind="user",
+    ),
+    IdentityRawAction(
+        action="Add app role assignment to service principal.",
+        application="AzureActiveDirectory",
+        target_kind="app",
+    ),
+    IdentityRawAction(
+        action="Consent to application.",
+        application="AzureActiveDirectory",
+        target_kind="app",
+    ),
+    IdentityRawAction(action="login", application="Okta", target_kind="user"),
+    IdentityRawAction(
+        action="user.session.start", application="Okta", target_kind="user"
+    ),
+    IdentityRawAction(
+        action="group.user_membership.add", application="Okta", target_kind="group"
+    ),
+    IdentityRawAction(
+        action="policy.lifecycle.update", application="Okta", target_kind="policy"
+    ),
+)
+
+
+# Group / app name pools feeding IdentityEvents.TargetObjects.
+_DEFAULT_IDENTITY_EVENT_GROUP_NAMES: tuple[str, ...] = (
+    "Engineering",
+    "Finance",
+    "Sales",
+    "Domain Admins",
+    "All Employees",
+    "Sales-EMEA",
+)
+_DEFAULT_IDENTITY_EVENT_APP_NAMES: tuple[str, ...] = (
+    "Salesforce",
+    "Box",
+    "Workday",
+    "ServiceNow",
+    "GitHub",
+)
+
+
+# Weighted LogonType + (protocol, port) for IdentityLogonEvents.
+_DEFAULT_IDENTITY_LOGON_TYPES: tuple[IdentityLogonType, ...] = (
+    IdentityLogonType(logon_type="Network", weight=50),
+    IdentityLogonType(logon_type="Interactive", weight=18),
+    IdentityLogonType(logon_type="RemoteInteractive", weight=12),
+    IdentityLogonType(logon_type="Service", weight=8),
+    IdentityLogonType(logon_type="Batch", weight=4),
+    IdentityLogonType(logon_type="Unlock", weight=4),
+    IdentityLogonType(logon_type="NetworkCleartext", weight=2),
+    IdentityLogonType(logon_type="CachedInteractive", weight=2),
+)
+_DEFAULT_IDENTITY_LOGON_PROTOCOLS: tuple[IdentityLogonProtocol, ...] = (
+    IdentityLogonProtocol(protocol="Kerberos", port=88, weight=70),
+    IdentityLogonProtocol(protocol="Ntlm", port=445, weight=22),
+    IdentityLogonProtocol(protocol="Ldap", port=389, weight=4),
+    IdentityLogonProtocol(protocol="LdapSecure", port=636, weight=4),
+)
+_DEFAULT_IDENTITY_LOGON_FAILURE_REASONS: tuple[str, ...] = (
+    "WrongPassword",
+    "AccountDisabled",
+    "AccountExpired",
+    "AccountLockedOut",
+    "PasswordExpired",
+    "NoSuchUser",
+    "TimeSkew",
+    "SmartcardRequired",
+)
+
+
+# IdentityQueryEvents — LDAP / SAMR / DNS recon shapes + target pools.
+_DEFAULT_IDENTITY_QUERY_KINDS: tuple[IdentityQueryKind, ...] = (
+    IdentityQueryKind(query_type="QueryUser", protocol="Ldap", port=389, weight=35),
+    IdentityQueryKind(query_type="QueryGroup", protocol="Ldap", port=389, weight=25),
+    IdentityQueryKind(
+        query_type="EnumerateUsers", protocol="Samr", port=445, weight=12
+    ),
+    IdentityQueryKind(
+        query_type="EnumerateGroups", protocol="Samr", port=445, weight=8
+    ),
+    IdentityQueryKind(query_type="QueryComputer", protocol="Ldap", port=389, weight=8),
+    IdentityQueryKind(query_type="QueryDomain", protocol="Ldap", port=389, weight=5),
+    IdentityQueryKind(query_type="Resolve", protocol="Dns", port=53, weight=7),
+)
+_DEFAULT_IDENTITY_QUERY_GROUP_TARGETS: tuple[str, ...] = (
+    "Domain Admins",
+    "Enterprise Admins",
+    "Schema Admins",
+    "Backup Operators",
+    "Account Operators",
+    "Server Operators",
+    "Engineering",
+    "Finance",
+    "All Employees",
+)
+_DEFAULT_IDENTITY_QUERY_COMPUTER_TARGETS: tuple[str, ...] = (
+    "DC01",
+    "DC02",
+    "FS01",
+    "EXCH01",
+    "CRM-DB-PROD",
+    "BUILD-AGENT-03",
+)
+
+
+# Safe Links outcomes + source workloads feeding UrlClickEvents.
+_DEFAULT_URL_CLICK_OUTCOMES: tuple[UrlClickOutcome, ...] = (
+    UrlClickOutcome(action_type="ClickAllowed", is_clicked_through=True, weight=86),
+    UrlClickOutcome(
+        action_type="Blockpage",
+        is_clicked_through=False,
+        threat_types="Phish",
+        weight=5,
+    ),
+    UrlClickOutcome(
+        action_type="BlockpageOverride",
+        is_clicked_through=True,
+        threat_types="Phish",
+        weight=2,
+    ),
+    UrlClickOutcome(
+        action_type="ClickBlocked",
+        is_clicked_through=False,
+        threat_types="Malware",
+        weight=3,
+    ),
+    UrlClickOutcome(
+        action_type="PendingDetonationPage", is_clicked_through=True, weight=4
+    ),
+)
+_DEFAULT_URL_CLICK_WORKLOADS: tuple[WeightedWorkload, ...] = (
+    WeightedWorkload(workload="Email", weight=75),
+    WeightedWorkload(workload="Office", weight=12),
+    WeightedWorkload(workload="Teams", weight=13),
+)
+
+
+# DeviceLogonEvents LogonType distribution — Network / Interactive dominate
+# on a managed endpoint.
+_DEFAULT_DEVICE_LOGON_TYPES: tuple[DeviceLogonType, ...] = (
+    DeviceLogonType(logon_type="Network", weight=50),
+    DeviceLogonType(logon_type="Interactive", weight=18),
+    DeviceLogonType(logon_type="RemoteInteractive", weight=10),
+    DeviceLogonType(logon_type="Service", weight=8),
+    DeviceLogonType(logon_type="Batch", weight=4),
+    DeviceLogonType(logon_type="Unlock", weight=4),
+    DeviceLogonType(logon_type="NetworkCleartext", weight=2),
+    DeviceLogonType(logon_type="CachedInteractive", weight=4),
+)
+
+
+# Authentication protocols feeding DeviceLogonEvents.Protocol.
+_DEFAULT_DEVICE_LOGON_PROTOCOLS: tuple[str, ...] = ("Kerberos", "Ntlm", "NetLogon")
+
+
+# Failure reasons feeding DeviceLogonEvents.FailureReason — populated only
+# when ActionType == "LogonFailed".
+_DEFAULT_DEVICE_LOGON_FAILURE_REASONS: tuple[str, ...] = (
+    "InvalidUserNameOrPassword",
+    "AccountDisabled",
+    "AccountExpired",
+    "AccountLockedOut",
+    "PasswordExpired",
+    "UnknownUser",
+    "TimeSkew",
+    "SmartcardRequired",
+)
+
+
+# Curated DLL pool feeding DeviceImageLoadEvents. FolderPath stays consistent
+# with the file name (Windows assigns kernel32.dll, ntdll.dll, etc. specific
+# locations on disk).
+_DEFAULT_LOADED_LIBRARIES: tuple[LoadedLibrary, ...] = (
+    LoadedLibrary(file_name="kernel32.dll", folder_path=r"C:\Windows\System32"),
+    LoadedLibrary(file_name="ntdll.dll", folder_path=r"C:\Windows\System32"),
+    LoadedLibrary(file_name="user32.dll", folder_path=r"C:\Windows\System32"),
+    LoadedLibrary(file_name="advapi32.dll", folder_path=r"C:\Windows\System32"),
+    LoadedLibrary(file_name="ws2_32.dll", folder_path=r"C:\Windows\System32"),
+    LoadedLibrary(file_name="crypt32.dll", folder_path=r"C:\Windows\System32"),
+    LoadedLibrary(file_name="ole32.dll", folder_path=r"C:\Windows\System32"),
+    LoadedLibrary(file_name="shell32.dll", folder_path=r"C:\Windows\System32"),
+    LoadedLibrary(file_name="rpcrt4.dll", folder_path=r"C:\Windows\System32"),
+    LoadedLibrary(file_name="msvcrt.dll", folder_path=r"C:\Windows\System32"),
+    LoadedLibrary(file_name="amsi.dll", folder_path=r"C:\Windows\System32"),
+    LoadedLibrary(file_name="wininet.dll", folder_path=r"C:\Windows\System32"),
+    LoadedLibrary(file_name="urlmon.dll", folder_path=r"C:\Windows\System32"),
+    LoadedLibrary(
+        file_name="System.Management.Automation.dll",
+        folder_path=r"C:\Windows\assembly\NativeImages_v4.0.30319_64",
+    ),
+)
+
+
+# Real code-signing certs feeding DeviceFileCertificateInfo.
+_DEFAULT_CODE_SIGNING_CERTIFICATES: tuple[CodeSigningCertificate, ...] = (
+    CodeSigningCertificate(
+        subject="Microsoft Windows",
+        issuer="Microsoft Windows Production PCA 2011",
+        serial="33000002ED2C45E4C145CF48E7000000000002",
+        is_root_microsoft=True,
+        signature_type="Embedded",
+    ),
+    CodeSigningCertificate(
+        subject="Microsoft Corporation",
+        issuer="Microsoft Code Signing PCA 2011",
+        serial="33000003318FA52A4D8F2E1F2A000000000333",
+        is_root_microsoft=True,
+        signature_type="Embedded",
+    ),
+    CodeSigningCertificate(
+        subject="Google LLC",
+        issuer="DigiCert Trusted G4 Code Signing RSA4096 SHA384 2021 CA1",
+        serial="0AA89F4DEF6C2C4DBD3C1AB37B17EBE5",
+        is_root_microsoft=False,
+        signature_type="Embedded",
+    ),
+    CodeSigningCertificate(
+        subject="Adobe Inc.",
+        issuer="DigiCert SHA2 Assured ID Code Signing CA",
+        serial="0F4F9D2BB12B4E8DAF3E2F46A1F19C2C",
+        is_root_microsoft=False,
+        signature_type="Embedded",
+    ),
+    CodeSigningCertificate(
+        subject="Mozilla Corporation",
+        issuer="DigiCert Trusted G4 Code Signing RSA4096 SHA384 2021 CA1",
+        serial="0EE0BCB37BFE32C7B1024F8AF8E1E2F1",
+        is_root_microsoft=False,
+        signature_type="Embedded",
+    ),
+    CodeSigningCertificate(
+        subject="GitHub, Inc.",
+        issuer="DigiCert SHA2 Assured ID Code Signing CA",
+        serial="00B0BCDFA1A0CF24E5BCEDE53C2F7B8B81",
+        is_root_microsoft=False,
+        signature_type="Embedded",
+    ),
+    CodeSigningCertificate(
+        subject="Slack Technologies, LLC",
+        issuer="Sectigo RSA Code Signing CA",
+        serial="0066AB7DC4B0A4E5BCEDE53C2F7B8B82A1",
+        is_root_microsoft=False,
+        signature_type="Embedded",
+    ),
+)
+
+
+# Filenames DeviceFileCertificateInfo derives a stable SHA-1 from. Hashes are
+# computed from the name so cross-table pivots line up with other Device*
+# tables.
+_DEFAULT_SIGNED_FILES: tuple[str, ...] = (
+    "explorer.exe",
+    "powershell.exe",
+    "svchost.exe",
+    "MsMpEng.exe",
+    "msedge.exe",
+    "chrome.exe",
+    "outlook.exe",
+    "winword.exe",
+)
+
+
+# CRL distribution points feeding DeviceFileCertificateInfo.CrlDistributionPointUrls.
+_DEFAULT_CRL_URLS: tuple[str, ...] = (
+    "http://www.microsoft.com/pkiops/crl/MicCodSigPCA_2011-07-08.crl",
+    "http://crl3.digicert.com/DigiCertTrustedG4CodeSigningRSA4096SHA384.crl",
+    "http://crl.sectigo.com/SectigoRSACodeSigningCA.crl",
+)
+
+
+# DeviceEvents ActionType pool — `shape` routes the row to a file / network /
+# registry / none auxiliary block. Default distribution is uniform; weights
+# let profiles bias toward a specific behaviour (e.g. ASR-heavy, AV-heavy).
+_DEFAULT_DEVICE_EVENT_ACTIONS: tuple[DeviceEventAction, ...] = (
+    DeviceEventAction(action="AntivirusDetection", shape="file"),
+    DeviceEventAction(action="AntivirusDetectionAndBlock", shape="file"),
+    DeviceEventAction(action="AntivirusReport", shape="file"),
+    DeviceEventAction(action="ExploitGuardNetworkProtectionBlocked", shape="network"),
+    DeviceEventAction(action="ExploitGuardNetworkProtectionAudited", shape="network"),
+    DeviceEventAction(action="AsrLsassCredentialTheftAudited", shape="none"),
+    DeviceEventAction(action="AsrOfficeChildProcessBlocked", shape="file"),
+    DeviceEventAction(action="AsrUntrustedExecutableAudited", shape="file"),
+    DeviceEventAction(action="BrowserLaunchedToOpenUrl", shape="network"),
+    DeviceEventAction(action="ScreenshotTaken", shape="none"),
+    DeviceEventAction(action="PowerShellCommand", shape="none"),
+    DeviceEventAction(action="AmsiScriptDetection", shape="none"),
+    DeviceEventAction(action="ControlFlowGuardViolation", shape="none"),
+    DeviceEventAction(action="TamperingAttempt", shape="registry"),
+    DeviceEventAction(action="AppControlPolicyApplied", shape="none"),
+    DeviceEventAction(action="OpenProcessApiCall", shape="none"),
+    DeviceEventAction(action="UsbDriveMounted", shape="none"),
+    DeviceEventAction(action="UsbDriveUnmounted", shape="none"),
+    DeviceEventAction(action="UserAccountAddedToLocalGroup", shape="none"),
+)
+
+
 # File templates feeding DeviceFileEvents. `{user}` is rendered to the picked
 # user's sam_account_name. UNC folders surface as ShareName + Request* on
 # NetworkShare* actions.
@@ -1659,6 +2499,61 @@ class World(BaseModel):
     graph_api_locations: tuple[str, ...] = _DEFAULT_GRAPH_API_LOCATIONS
     network_destinations: tuple[NetworkDestination, ...] = _DEFAULT_NETWORK_DESTINATIONS
     registry_targets: tuple[RegistryTarget, ...] = _DEFAULT_REGISTRY_TARGETS
+    device_event_actions: tuple[DeviceEventAction, ...] = _DEFAULT_DEVICE_EVENT_ACTIONS
+    code_signing_certificates: tuple[CodeSigningCertificate, ...] = (
+        _DEFAULT_CODE_SIGNING_CERTIFICATES
+    )
+    signed_files: tuple[str, ...] = _DEFAULT_SIGNED_FILES
+    crl_urls: tuple[str, ...] = _DEFAULT_CRL_URLS
+    loaded_libraries: tuple[LoadedLibrary, ...] = _DEFAULT_LOADED_LIBRARIES
+    device_logon_types: tuple[DeviceLogonType, ...] = _DEFAULT_DEVICE_LOGON_TYPES
+    device_logon_protocols: tuple[str, ...] = _DEFAULT_DEVICE_LOGON_PROTOCOLS
+    device_logon_failure_reasons: tuple[str, ...] = (
+        _DEFAULT_DEVICE_LOGON_FAILURE_REASONS
+    )
+    cloud_apps: tuple[CloudApp, ...] = _DEFAULT_CLOUD_APPS
+    cloud_app_file_names: tuple[str, ...] = _DEFAULT_CLOUD_APP_FILE_NAMES
+    cloud_app_mail_subjects: tuple[str, ...] = _DEFAULT_CLOUD_APP_MAIL_SUBJECTS
+    cloud_app_group_names: tuple[str, ...] = _DEFAULT_CLOUD_APP_GROUP_NAMES
+    device_network_action_types: tuple[DeviceNetworkActionType, ...] = (
+        _DEFAULT_DEVICE_NETWORK_ACTIONS
+    )
+    network_adapters: tuple[NetworkAdapter, ...] = _DEFAULT_NETWORK_ADAPTERS
+    local_dns_servers: tuple[str, ...] = _DEFAULT_LOCAL_DNS_SERVERS
+    local_default_gateways: tuple[str, ...] = _DEFAULT_LOCAL_DEFAULT_GATEWAYS
+    device_registry_action_types: tuple[DeviceRegistryActionType, ...] = (
+        _DEFAULT_DEVICE_REGISTRY_ACTIONS
+    )
+    email_post_delivery_paths: tuple[EmailPostDeliveryPath, ...] = (
+        _DEFAULT_EMAIL_POST_DELIVERY_PATHS
+    )
+    graph_api_status_codes: tuple[GraphApiStatusCode, ...] = (
+        _DEFAULT_GRAPH_API_STATUS_CODES
+    )
+    identity_auth_methods: tuple[str, ...] = _DEFAULT_IDENTITY_AUTH_METHODS
+    identity_risk_levels: tuple[IdentityRiskLevel, ...] = _DEFAULT_IDENTITY_RISK_LEVELS
+    identity_directory_action_types: tuple[IdentityDirectoryActionType, ...] = (
+        _DEFAULT_IDENTITY_DIRECTORY_ACTIONS
+    )
+    identity_raw_actions: tuple[IdentityRawAction, ...] = _DEFAULT_IDENTITY_RAW_ACTIONS
+    identity_event_group_names: tuple[str, ...] = _DEFAULT_IDENTITY_EVENT_GROUP_NAMES
+    identity_event_app_names: tuple[str, ...] = _DEFAULT_IDENTITY_EVENT_APP_NAMES
+    identity_logon_types: tuple[IdentityLogonType, ...] = _DEFAULT_IDENTITY_LOGON_TYPES
+    identity_logon_protocols: tuple[IdentityLogonProtocol, ...] = (
+        _DEFAULT_IDENTITY_LOGON_PROTOCOLS
+    )
+    identity_logon_failure_reasons: tuple[str, ...] = (
+        _DEFAULT_IDENTITY_LOGON_FAILURE_REASONS
+    )
+    identity_query_kinds: tuple[IdentityQueryKind, ...] = _DEFAULT_IDENTITY_QUERY_KINDS
+    identity_query_group_targets: tuple[str, ...] = (
+        _DEFAULT_IDENTITY_QUERY_GROUP_TARGETS
+    )
+    identity_query_computer_targets: tuple[str, ...] = (
+        _DEFAULT_IDENTITY_QUERY_COMPUTER_TARGETS
+    )
+    url_click_outcomes: tuple[UrlClickOutcome, ...] = _DEFAULT_URL_CLICK_OUTCOMES
+    url_click_workloads: tuple[WeightedWorkload, ...] = _DEFAULT_URL_CLICK_WORKLOADS
     file_templates: tuple[FileTemplate, ...] = _DEFAULT_FILE_TEMPLATES
     file_action_types: tuple[FileActionType, ...] = _DEFAULT_FILE_ACTION_TYPES
     file_sensitivity_labels: tuple[SensitivityLabel, ...] = (
@@ -1702,6 +2597,39 @@ class Overrides(BaseModel):
     graph_api_locations: Optional[list[str]] = None
     network_destinations: Optional[list[NetworkDestination]] = None
     registry_targets: Optional[list[RegistryTarget]] = None
+    device_event_actions: Optional[list[DeviceEventAction]] = None
+    code_signing_certificates: Optional[list[CodeSigningCertificate]] = None
+    signed_files: Optional[list[str]] = None
+    crl_urls: Optional[list[str]] = None
+    loaded_libraries: Optional[list[LoadedLibrary]] = None
+    device_logon_types: Optional[list[DeviceLogonType]] = None
+    device_logon_protocols: Optional[list[str]] = None
+    device_logon_failure_reasons: Optional[list[str]] = None
+    cloud_apps: Optional[list[CloudApp]] = None
+    cloud_app_file_names: Optional[list[str]] = None
+    cloud_app_mail_subjects: Optional[list[str]] = None
+    cloud_app_group_names: Optional[list[str]] = None
+    device_network_action_types: Optional[list[DeviceNetworkActionType]] = None
+    network_adapters: Optional[list[NetworkAdapter]] = None
+    local_dns_servers: Optional[list[str]] = None
+    local_default_gateways: Optional[list[str]] = None
+    device_registry_action_types: Optional[list[DeviceRegistryActionType]] = None
+    email_post_delivery_paths: Optional[list[EmailPostDeliveryPath]] = None
+    graph_api_status_codes: Optional[list[GraphApiStatusCode]] = None
+    identity_auth_methods: Optional[list[str]] = None
+    identity_risk_levels: Optional[list[IdentityRiskLevel]] = None
+    identity_directory_action_types: Optional[list[IdentityDirectoryActionType]] = None
+    identity_raw_actions: Optional[list[IdentityRawAction]] = None
+    identity_event_group_names: Optional[list[str]] = None
+    identity_event_app_names: Optional[list[str]] = None
+    identity_logon_types: Optional[list[IdentityLogonType]] = None
+    identity_logon_protocols: Optional[list[IdentityLogonProtocol]] = None
+    identity_logon_failure_reasons: Optional[list[str]] = None
+    identity_query_kinds: Optional[list[IdentityQueryKind]] = None
+    identity_query_group_targets: Optional[list[str]] = None
+    identity_query_computer_targets: Optional[list[str]] = None
+    url_click_outcomes: Optional[list[UrlClickOutcome]] = None
+    url_click_workloads: Optional[list[WeightedWorkload]] = None
     file_templates: Optional[list[FileTemplate]] = None
     file_action_types: Optional[list[FileActionType]] = None
     file_sensitivity_labels: Optional[list[SensitivityLabel]] = None

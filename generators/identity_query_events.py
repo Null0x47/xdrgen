@@ -7,49 +7,19 @@ from generators.base import register
 from generators.common import now_utc
 from world import World
 
-# (QueryType, Protocol, Port, weight) for LDAP / SAMR / DNS reconnaissance.
-_QUERY_KINDS = [
-    ("QueryUser", "Ldap", 389, 35),
-    ("QueryGroup", "Ldap", 389, 25),
-    ("EnumerateUsers", "Samr", 445, 12),
-    ("EnumerateGroups", "Samr", 445, 8),
-    ("QueryComputer", "Ldap", 389, 8),
-    ("QueryDomain", "Ldap", 389, 5),
-    ("Resolve", "Dns", 53, 7),
-]
-_QUERY_VALUES, _QUERY_PROTOCOLS, _QUERY_PORTS, _QUERY_WEIGHTS = zip(*_QUERY_KINDS)
-
-# BloodHound-style targets for QueryTarget values.
-_GROUP_TARGETS = [
-    "Domain Admins",
-    "Enterprise Admins",
-    "Schema Admins",
-    "Backup Operators",
-    "Account Operators",
-    "Server Operators",
-    "Engineering",
-    "Finance",
-    "All Employees",
-]
-_COMPUTER_TARGETS = [
-    "DC01",
-    "DC02",
-    "FS01",
-    "EXCH01",
-    "CRM-DB-PROD",
-    "BUILD-AGENT-03",
-]
-
 
 def _query_target_for_kind(query_type: str, world: World) -> str:
     if "Group" in query_type:
-        return random.choice(_GROUP_TARGETS)
+        return random.choice(world.identity_query_group_targets)
     if "Computer" in query_type:
-        return random.choice(_COMPUTER_TARGETS)
+        return random.choice(world.identity_query_computer_targets)
     if query_type == "QueryDomain":
         return world.on_prem_ad_domain
     if query_type == "Resolve":
-        return random.choice(_COMPUTER_TARGETS) + f".{world.on_prem_ad_domain}"
+        return (
+            random.choice(world.identity_query_computer_targets)
+            + f".{world.on_prem_ad_domain}"
+        )
     candidates = [u for u in world.users if u.sam_account_name]
     pick = random.choice(candidates) if candidates else random.choice(world.users)
     return pick.sam_account_name or pick.upn
@@ -80,10 +50,14 @@ def generate(world: World) -> IdentityQueryEvents:
     dc = random.choice(world.domain_controllers)
     timestamp = now_utc()
 
-    idx = random.choices(range(len(_QUERY_VALUES)), weights=_QUERY_WEIGHTS, k=1)[0]
-    query_type = _QUERY_VALUES[idx]
-    protocol = _QUERY_PROTOCOLS[idx]
-    destination_port = _QUERY_PORTS[idx]
+    kind = random.choices(
+        world.identity_query_kinds,
+        weights=[k.weight for k in world.identity_query_kinds],
+        k=1,
+    )[0]
+    query_type = kind.query_type
+    protocol = kind.protocol
+    destination_port = kind.port
 
     target = _query_target_for_kind(query_type, world)
     query = _ldap_query_string(query_type, target)

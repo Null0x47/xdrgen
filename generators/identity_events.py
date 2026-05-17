@@ -8,42 +8,8 @@ from generators.base import register
 from generators.common import now_utc
 from world import User, World
 
-# Raw (action, application, target_kind) — ActionType is the source's own value.
-_RAW_ACTIONS = [
-    ("UserLoggedIn", "AzureActiveDirectory", "user"),
-    ("UserLoginFailed", "AzureActiveDirectory", "user"),
-    ("Add user.", "AzureActiveDirectory", "user"),
-    ("Delete user.", "AzureActiveDirectory", "user"),
-    ("Update user.", "AzureActiveDirectory", "user"),
-    ("Add member to group.", "AzureActiveDirectory", "group"),
-    ("Remove member from group.", "AzureActiveDirectory", "group"),
-    ("Reset user password.", "AzureActiveDirectory", "user"),
-    ("Add app role assignment to service principal.", "AzureActiveDirectory", "app"),
-    ("Consent to application.", "AzureActiveDirectory", "app"),
-    ("login", "Okta", "user"),
-    ("user.session.start", "Okta", "user"),
-    ("group.user_membership.add", "Okta", "group"),
-    ("policy.lifecycle.update", "Okta", "policy"),
-]
 
-_GROUP_NAMES = [
-    "Engineering",
-    "Finance",
-    "Sales",
-    "Domain Admins",
-    "All Employees",
-    "Sales-EMEA",
-]
-_APP_NAMES = [
-    "Salesforce",
-    "Box",
-    "Workday",
-    "ServiceNow",
-    "GitHub",
-]
-
-
-def _target_objects(kind: str, user: User) -> list[dict]:
+def _target_objects(kind: str, user: User, world: World) -> list[dict]:
     if kind == "user":
         return [
             {
@@ -56,7 +22,7 @@ def _target_objects(kind: str, user: User) -> list[dict]:
         return [
             {
                 "Type": "group",
-                "Name": random.choice(_GROUP_NAMES),
+                "Name": random.choice(world.identity_event_group_names),
                 "Id": str(uuid.uuid4()),
             }
         ]
@@ -64,7 +30,7 @@ def _target_objects(kind: str, user: User) -> list[dict]:
         return [
             {
                 "Type": "application",
-                "Name": random.choice(_APP_NAMES),
+                "Name": random.choice(world.identity_event_app_names),
                 "Id": str(uuid.uuid4()),
             }
         ]
@@ -84,8 +50,13 @@ def generate(world: World) -> IdentityEvents:
     ua = random.choice(world.user_agents)
     timestamp = now_utc()
 
-    action_type, application, target_kind = random.choice(_RAW_ACTIONS)
-    target_objects = _target_objects(target_kind, user)
+    raw = random.choices(
+        world.identity_raw_actions,
+        weights=[r.weight for r in world.identity_raw_actions],
+        k=1,
+    )[0]
+    action_type, application, target_kind = raw.action, raw.application, raw.target_kind
+    target_objects = _target_objects(target_kind, user, world)
 
     failed = "Failed" in action_type or "fail" in action_type.lower()
     action_result = "Failure" if failed else "Success"

@@ -13,25 +13,6 @@ from world import World
 # Tied to a pool email so rows pivot to EmailEvents / EmailUrlInfo via
 # NetworkMessageId.
 
-# (ActionType, IsClickedThrough, ThreatTypes, weight)
-_CLICK_OUTCOMES = [
-    ("ClickAllowed", True, None, 86),
-    ("Blockpage", False, "Phish", 5),
-    ("BlockpageOverride", True, "Phish", 2),
-    ("ClickBlocked", False, "Malware", 3),
-    ("PendingDetonationPage", True, None, 4),
-]
-_OUTCOME_VALUES = list(range(len(_CLICK_OUTCOMES)))
-_OUTCOME_WEIGHTS = [c[3] for c in _CLICK_OUTCOMES]
-
-# Source workload weights — Email dominates.
-_WORKLOADS = [
-    ("Email", 75),
-    ("Office", 12),
-    ("Teams", 13),
-]
-_WORKLOAD_VALUES, _WORKLOAD_WEIGHTS = zip(*_WORKLOADS)
-
 
 def _redirect_chain(url: str) -> str:
     """JSON array: [safelinks, (optional tracker), final URL]."""
@@ -51,22 +32,32 @@ def generate(world: World) -> UrlClickEvents:
     ip = random.choice(world.ips)
     timestamp = now_utc()
 
-    idx = random.choices(_OUTCOME_VALUES, weights=_OUTCOME_WEIGHTS, k=1)[0]
-    action_type, is_clicked_through, threat_types_outcome, _ = _CLICK_OUTCOMES[idx]
+    outcome = random.choices(
+        world.url_click_outcomes,
+        weights=[o.weight for o in world.url_click_outcomes],
+        k=1,
+    )[0]
+    action_type = outcome.action_type
+    is_clicked_through = outcome.is_clicked_through
+    threat_types_outcome = outcome.threat_types
 
     # Email's verdict overrides the rolled outcome — Safe Links blocks
     # known-phish URLs.
     threat_types = email["threat_types"] or threat_types_outcome
     if threat_types in ("Phish", "Malware"):
-        action_type, is_clicked_through = random.choice(
-            [
-                ("Blockpage", False),
-                ("ClickBlocked", False),
-                ("BlockpageOverride", True),
-            ]
-        )
+        blockers = [
+            o
+            for o in world.url_click_outcomes
+            if not o.is_clicked_through or o.action_type == "BlockpageOverride"
+        ] or list(world.url_click_outcomes)
+        chosen = random.choice(blockers)
+        action_type, is_clicked_through = chosen.action_type, chosen.is_clicked_through
 
-    workload = random.choices(_WORKLOAD_VALUES, weights=_WORKLOAD_WEIGHTS, k=1)[0]
+    workload = random.choices(
+        [w.workload for w in world.url_click_workloads],
+        weights=[w.weight for w in world.url_click_workloads],
+        k=1,
+    )[0]
 
     detection_methods = email["detection_methods"] if threat_types else None
 

@@ -16,37 +16,18 @@ from generators.device_common import (
 from models import DeviceEvents
 from world import World
 
-# (action_type, shape) where shape ∈ {"file", "network", "registry", "none"}
-# selects which auxiliary column block the row populates.
-_ACTION_TYPES = [
-    ("AntivirusDetection", "file"),
-    ("AntivirusDetectionAndBlock", "file"),
-    ("AntivirusReport", "file"),
-    ("ExploitGuardNetworkProtectionBlocked", "network"),
-    ("ExploitGuardNetworkProtectionAudited", "network"),
-    ("AsrLsassCredentialTheftAudited", "none"),
-    ("AsrOfficeChildProcessBlocked", "file"),
-    ("AsrUntrustedExecutableAudited", "file"),
-    ("BrowserLaunchedToOpenUrl", "network"),
-    ("ScreenshotTaken", "none"),
-    ("PowerShellCommand", "none"),
-    ("AmsiScriptDetection", "none"),
-    ("ControlFlowGuardViolation", "none"),
-    ("TamperingAttempt", "registry"),
-    ("AppControlPolicyApplied", "none"),
-    ("OpenProcessApiCall", "none"),
-    ("UsbDriveMounted", "none"),
-    ("UsbDriveUnmounted", "none"),
-    ("UserAccountAddedToLocalGroup", "none"),
-]
-
 
 @register("DeviceEvents")
 def generate(world: World) -> DeviceEvents:
     device = pick_device(world)
     user = pick_user_for_device(world, device)
 
-    action_type, shape = random.choice(_ACTION_TYPES)
+    picked = random.choices(
+        world.device_event_actions,
+        weights=[a.weight for a in world.device_event_actions],
+        k=1,
+    )[0]
+    action_type, shape = picked.action, picked.shape
     initiator_logon_id = random.randint(100_000, 9_999_999)
     initiator_fields = initiating_process_fields(
         world, user, logon_id=initiator_logon_id

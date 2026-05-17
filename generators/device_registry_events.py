@@ -12,25 +12,17 @@ from generators.device_common import (
 from models import DeviceRegistryEvents
 from world import World
 
-# Weighted ActionType — RegistryValueSet dominates.
-_ACTION_TYPES = [
-    ("RegistryValueSet", 60),
-    ("RegistryKeyCreated", 12),
-    ("RegistryValueDeleted", 10),
-    ("RegistryKeyDeleted", 8),
-    ("RegistryKeyRenamed", 4),
-    ("RegistryValueRenamed", 4),
-    ("RegistryKeyAndValueDeleted", 2),
-]
-_ACTION_VALUES, _ACTION_WEIGHTS = zip(*_ACTION_TYPES)
-
 
 @register("DeviceRegistryEvents")
 def generate(world: World) -> DeviceRegistryEvents:
     device = pick_device(world)
     user = pick_user_for_device(world, device)
 
-    action_type = random.choices(_ACTION_VALUES, weights=_ACTION_WEIGHTS, k=1)[0]
+    action_type = random.choices(
+        [a.action for a in world.device_registry_action_types],
+        weights=[a.weight for a in world.device_registry_action_types],
+        k=1,
+    )[0]
     target = random.choice(world.registry_targets)
     key, value_name, value_data, value_type = (
         target.key,

@@ -402,6 +402,87 @@ overrides:
           domain: northwind-update.io
           location: Body
 
+  # DeviceEvents ActionType pool. `shape` ∈ {file, network, registry, none}
+  # routes the row to the matching auxiliary column block — `file` populates
+  # FileName / MD5 / FileOrigin*, `network` populates Local/Remote IP+port,
+  # `registry` populates RegistryKey / Value*. `weight` is optional (default 1).
+  device_event_actions:
+    - action: AntivirusDetectionAndBlock
+      shape: file
+      weight: 5
+    - action: AsrLsassCredentialTheftAudited
+      shape: none
+      weight: 3
+    - action: ExploitGuardNetworkProtectionBlocked
+      shape: network
+      weight: 2
+    - action: TamperingAttempt
+      shape: registry
+      weight: 1
+
+  # DeviceLogonEvents LogonType distribution. Use MDE's vocabulary
+  # (Network, Interactive, RemoteInteractive, Service, Batch, Unlock,
+  # NetworkCleartext, CachedInteractive).
+  device_logon_types:
+    - logon_type: Network
+      weight: 60
+    - logon_type: Interactive
+      weight: 25
+    - logon_type: RemoteInteractive
+      weight: 10
+    - logon_type: Service
+      weight: 5
+
+  # Authentication protocols feeding DeviceLogonEvents.Protocol.
+  device_logon_protocols:
+    - Kerberos
+    - Ntlm
+
+  # FailureReason vocabulary — populated only when ActionType == "LogonFailed".
+  device_logon_failure_reasons:
+    - InvalidUserNameOrPassword
+    - AccountLockedOut
+    - SmartcardRequired
+
+  # DLL / assembly pool feeding DeviceImageLoadEvents. `folder_path` is the
+  # directory the library lives in; the generator concatenates with file_name
+  # to render FolderPath. Hashes are derived from file_name.
+  loaded_libraries:
+    - file_name: kernel32.dll
+      folder_path: 'C:\Windows\System32'
+    - file_name: amsi.dll
+      folder_path: 'C:\Windows\System32'
+    - file_name: northwind-agent.dll
+      folder_path: 'C:\Program Files\Northwind\bin'
+
+  # Code-signing certs feeding DeviceFileCertificateInfo. `is_root_microsoft`
+  # drives the IsRootSignerMicrosoft column; `signature_type` matches MDE
+  # values (`Embedded`, `Catalog`, `None`).
+  code_signing_certificates:
+    - subject: Northwind Corporation
+      issuer: Northwind Code Signing CA
+      serial: 33000003318FA52A4D8F2E1F2A000000000333
+      is_root_microsoft: false
+      signature_type: Embedded
+    - subject: Microsoft Windows
+      issuer: Microsoft Windows Production PCA 2011
+      serial: 33000002ED2C45E4C145CF48E7000000000002
+      is_root_microsoft: true
+      signature_type: Embedded
+
+  # Filenames whose SHA-1 surfaces in DeviceFileCertificateInfo.SHA1. Hashes
+  # are derived deterministically from the name so they line up with other
+  # Device* tables.
+  signed_files:
+    - explorer.exe
+    - powershell.exe
+    - northwind-agent.exe
+
+  # CRL distribution points feeding DeviceFileCertificateInfo.CrlDistributionPointUrls.
+  crl_urls:
+    - http://crl.northwind.com/codesign.crl
+    - http://www.microsoft.com/pkiops/crl/MicCodSigPCA_2011-07-08.crl
+
   # File templates feeding DeviceFileEvents. `{user}` is rendered to the
   # picked user's sam_account_name. `kind` ∈ {download, doc, temp, share}:
   # `download` populates FileOrigin*, `share` routes through SMB semantics
@@ -444,3 +525,233 @@ overrides:
   file_download_hosts:
     - files.northwind.com
     - downloads.northwind-supplier.com
+
+  # Defender for Cloud Apps connectors feeding CloudAppEvents. `actions` is the
+  # per-connector ActionType vocabulary (file/mail/account/group/other actions
+  # route to different ActivityObjects shapes automatically).
+  cloud_apps:
+    - name: Microsoft 365
+      app_id: 11161
+      instance_id: 1001
+      audit_source: Office 365
+      actions:
+        - FileAccessed
+        - FileDownloaded
+        - SharingSet
+    - name: GitHub
+      app_id: 15760
+      instance_id: 1006
+      audit_source: GitHub
+      actions:
+        - git.clone
+        - git.push
+        - repo.create
+
+  # Object-name pools CloudAppEvents draws from depending on action shape.
+  cloud_app_file_names:
+    - Q3_forecast.xlsx
+    - design-spec.docx
+  cloud_app_mail_subjects:
+    - "Re: Q3 numbers"
+    - "FW: NDA draft"
+  cloud_app_group_names:
+    - Engineering
+    - Finance
+
+  # DeviceNetworkEvents ActionType distribution — `ConnectionSuccess` typically
+  # dominates a healthy fleet.
+  device_network_action_types:
+    - action: ConnectionSuccess
+      weight: 60
+    - action: ConnectionFailed
+      weight: 8
+    - action: DnsConnectionInspected
+      weight: 8
+
+  # DeviceNetworkInfo adapter pool — one row per emit picks one. `tunnel`
+  # is null for non-VPN adapters.
+  network_adapters:
+    - name: Wi-Fi
+      type: Wireless
+      vendor: Intel Corporation
+      tunnel: null
+      network_category: Private
+      network_name: NORTHWIND-CORP
+    - name: GlobalProtect VPN
+      type: Tunnel
+      vendor: Palo Alto Networks
+      tunnel: Ssh
+      network_category: Domain
+      network_name: nw-vpn
+
+  # DeviceNetworkInfo DNS resolvers + default gateways.
+  local_dns_servers:
+    - 10.10.0.10
+    - 10.10.0.11
+    - 1.1.1.1
+  local_default_gateways:
+    - 10.10.20.1
+    - 10.10.30.1
+
+  # DeviceRegistryEvents ActionType distribution.
+  device_registry_action_types:
+    - action: RegistryValueSet
+      weight: 60
+    - action: RegistryKeyCreated
+      weight: 20
+    - action: RegistryKeyDeleted
+      weight: 10
+    - action: RegistryValueDeleted
+      weight: 10
+
+  # EmailPostDeliveryEvents action paths. Phish-verdict mail is constrained
+  # to ZAP / Admin triggers regardless of weighting.
+  email_post_delivery_paths:
+    - action: Move to junk
+      action_type: Phish ZAP
+      trigger: ZAP
+      result: Success
+      delivery_location: JunkFolder
+    - action: Soft delete
+      action_type: Manual remediation
+      trigger: Admin
+      result: Success
+      delivery_location: Deleted Items
+    - action: Move to inbox
+      action_type: User reported not junk
+      trigger: User
+      result: Success
+      delivery_location: Inbox
+
+  # GraphApiAuditEvents HTTP status distribution. `204 No Content` writes
+  # zero response bytes regardless of weighting.
+  graph_api_status_codes:
+    - code: "200"
+      weight: 80
+    - code: "204"
+      weight: 5
+    - code: "403"
+      weight: 5
+    - code: "429"
+      weight: 5
+    - code: "500"
+      weight: 5
+
+  # IdentityAccountInfo authentication method pool.
+  identity_auth_methods:
+    - Credentials
+    - Federated
+
+  # IdentityAccountInfo DefenderRiskLevel distribution (0=None .. 3=High).
+  identity_risk_levels:
+    - level: 0
+      weight: 80
+    - level: 1
+      weight: 15
+    - level: 2
+      weight: 4
+    - level: 3
+      weight: 1
+
+  # IdentityDirectoryEvents ActionType distribution (MDI vocabulary).
+  identity_directory_action_types:
+    - action: Group Membership changed
+      weight: 32
+    - action: Account Password changed
+      weight: 22
+    - action: Service Principal Name added to account
+      weight: 5
+
+  # IdentityEvents raw action pool. `target_kind` ∈ {user, group, app, policy}
+  # drives the TargetObjects shape.
+  identity_raw_actions:
+    - action: UserLoggedIn
+      application: AzureActiveDirectory
+      target_kind: user
+      weight: 5
+    - action: Add member to group.
+      application: AzureActiveDirectory
+      target_kind: group
+      weight: 2
+    - action: group.user_membership.add
+      application: Okta
+      target_kind: group
+      weight: 1
+
+  # IdentityEvents target-object name pools.
+  identity_event_group_names:
+    - Engineering
+    - Finance
+    - Domain Admins
+  identity_event_app_names:
+    - Salesforce
+    - GitHub
+
+  # IdentityLogonEvents LogonType / (protocol, port) / failure-reason pools.
+  identity_logon_types:
+    - logon_type: Network
+      weight: 50
+    - logon_type: Interactive
+      weight: 25
+    - logon_type: Service
+      weight: 25
+  identity_logon_protocols:
+    - protocol: Kerberos
+      port: 88
+      weight: 70
+    - protocol: Ntlm
+      port: 445
+      weight: 30
+  identity_logon_failure_reasons:
+    - WrongPassword
+    - AccountLockedOut
+    - SmartcardRequired
+
+  # IdentityQueryEvents — LDAP/SAMR/DNS recon shapes + target pools.
+  identity_query_kinds:
+    - query_type: QueryUser
+      protocol: Ldap
+      port: 389
+      weight: 35
+    - query_type: EnumerateUsers
+      protocol: Samr
+      port: 445
+      weight: 12
+    - query_type: Resolve
+      protocol: Dns
+      port: 53
+      weight: 7
+  identity_query_group_targets:
+    - Domain Admins
+    - Enterprise Admins
+  identity_query_computer_targets:
+    - DC01
+    - FS01
+
+  # UrlClickEvents Safe Links outcome pool. Phish-verdict emails are forced
+  # to a blocking outcome regardless of weighting.
+  url_click_outcomes:
+    - action_type: ClickAllowed
+      is_clicked_through: true
+      weight: 86
+    - action_type: Blockpage
+      is_clicked_through: false
+      threat_types: Phish
+      weight: 7
+    - action_type: ClickBlocked
+      is_clicked_through: false
+      threat_types: Malware
+      weight: 4
+    - action_type: BlockpageOverride
+      is_clicked_through: true
+      threat_types: Phish
+      weight: 3
+
+  # UrlClickEvents source workload distribution.
+  url_click_workloads:
+    - workload: Email
+      weight: 80
+    - workload: Teams
+      weight: 12
+    - workload: Office
+      weight: 8

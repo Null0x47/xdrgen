@@ -13,32 +13,6 @@ from generators.device_common import (
 from models import DeviceLogonEvents
 from world import World
 
-# Weighted LogonType — Network/Interactive dominate on a managed endpoint.
-_LOGON_TYPES = [
-    ("Network", 50),
-    ("Interactive", 18),
-    ("RemoteInteractive", 10),
-    ("Service", 8),
-    ("Batch", 4),
-    ("Unlock", 4),
-    ("NetworkCleartext", 2),
-    ("CachedInteractive", 4),
-]
-_LOGON_TYPE_VALUES, _LOGON_TYPE_WEIGHTS = zip(*_LOGON_TYPES)
-
-_PROTOCOLS = ("Kerberos", "Ntlm", "NetLogon")
-
-_FAILURE_REASONS = (
-    "InvalidUserNameOrPassword",
-    "AccountDisabled",
-    "AccountExpired",
-    "AccountLockedOut",
-    "PasswordExpired",
-    "UnknownUser",
-    "TimeSkew",
-    "SmartcardRequired",
-)
-
 
 @register("DeviceLogonEvents")
 def generate(world: World) -> DeviceLogonEvents:
@@ -48,8 +22,12 @@ def generate(world: World) -> DeviceLogonEvents:
 
     success = random.random() < 0.92
     action_type = "LogonSuccess" if success else "LogonFailed"
-    logon_type = random.choices(_LOGON_TYPE_VALUES, weights=_LOGON_TYPE_WEIGHTS, k=1)[0]
-    protocol = random.choice(_PROTOCOLS)
+    logon_type = random.choices(
+        [t.logon_type for t in world.device_logon_types],
+        weights=[t.weight for t in world.device_logon_types],
+        k=1,
+    )[0]
+    protocol = random.choice(world.device_logon_protocols)
     logon_id = random.randint(100_000, 9_999_999)
 
     # Local logons leave RemoteIP/Port null.
@@ -72,7 +50,9 @@ def generate(world: World) -> DeviceLogonEvents:
         ActionType=action_type,
         AdditionalFields=None,
         AppGuardContainerId=None,
-        FailureReason=random.choice(_FAILURE_REASONS) if not success else None,
+        FailureReason=(
+            random.choice(world.device_logon_failure_reasons) if not success else None
+        ),
         IsLocalAdmin=user.type == "Admin",
         LogonId=logon_id,
         LogonType=logon_type,

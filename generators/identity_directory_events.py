@@ -7,27 +7,6 @@ from generators.base import register
 from generators.common import now_utc
 from world import World
 
-# Weighted ActionType — group/password churn dominates.
-_ACTION_TYPES = [
-    ("Group Membership changed", 32),
-    ("Account Password changed", 22),
-    ("Account enabled", 8),
-    ("Account disabled", 6),
-    ("Group created", 4),
-    ("Group deleted", 2),
-    ("User created", 4),
-    ("User deleted", 2),
-    ("Account name changed", 3),
-    ("Account display name changed", 5),
-    ("Domain controller authentication policy changed", 1),
-    ("Account Constrained Delegation state changed", 1),
-    ("Account Unconstrained Delegation state changed", 1),
-    ("Account Sensitive flag changed", 2),
-    ("Service Principal Name added to account", 4),
-    ("Service Principal Name removed from account", 3),
-]
-_ACTION_VALUES, _ACTION_WEIGHTS = zip(*_ACTION_TYPES)
-
 
 @register("IdentityDirectoryEvents")
 def generate(world: World) -> IdentityDirectoryEvents:
@@ -37,7 +16,11 @@ def generate(world: World) -> IdentityDirectoryEvents:
     dc = random.choice(world.domain_controllers)
     timestamp = now_utc()
 
-    action_type = random.choices(_ACTION_VALUES, weights=_ACTION_WEIGHTS, k=1)[0]
+    action_type = random.choices(
+        [a.action for a in world.identity_directory_action_types],
+        weights=[a.weight for a in world.identity_directory_action_types],
+        k=1,
+    )[0]
 
     return IdentityDirectoryEvents(
         AccountDisplayName=actor.display_name,

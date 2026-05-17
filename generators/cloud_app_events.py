@@ -8,117 +8,6 @@ from generators.base import register
 from generators.common import now_utc
 from world import User, World
 
-# ApplicationId / actions sourced from the Defender for Cloud Apps catalogue.
-_APPS = [
-    {
-        "name": "Microsoft 365",
-        "app_id": 11161,
-        "instance_id": 1001,
-        "audit_source": "Office 365",
-        "actions": [
-            "FileAccessed",
-            "FileDownloaded",
-            "FileUploaded",
-            "FileModified",
-            "FileDeleted",
-            "FileSyncDownloadedFull",
-            "FileSyncUploadedFull",
-            "SharingSet",
-            "AnonymousLinkCreated",
-        ],
-    },
-    {
-        "name": "Microsoft Exchange Online",
-        "app_id": 20893,
-        "instance_id": 1002,
-        "audit_source": "Office 365",
-        "actions": [
-            "MailItemsAccessed",
-            "Send",
-            "Update",
-            "MoveToDeletedItems",
-            "SoftDelete",
-            "HardDelete",
-            "New-InboxRule",
-            "Set-Mailbox",
-        ],
-    },
-    {
-        "name": "Microsoft Teams",
-        "app_id": 28375,
-        "instance_id": 1003,
-        "audit_source": "Office 365",
-        "actions": [
-            "MessageSent",
-            "MemberAdded",
-            "MemberRemoved",
-            "TeamCreated",
-            "ChannelAdded",
-            "MeetingDetail",
-        ],
-    },
-    {
-        "name": "Salesforce",
-        "app_id": 11114,
-        "instance_id": 1004,
-        "audit_source": "Salesforce",
-        "actions": [
-            "Login",
-            "Logout",
-            "ReportRun",
-            "RecordExported",
-            "ApiCall",
-            "PasswordChange",
-        ],
-    },
-    {
-        "name": "Box",
-        "app_id": 10489,
-        "instance_id": 1005,
-        "audit_source": "Box",
-        "actions": [
-            "FILE_PREVIEW",
-            "DOWNLOAD",
-            "UPLOAD",
-            "DELETE",
-            "SHARE",
-            "COLLABORATION_INVITE",
-        ],
-    },
-    {
-        "name": "GitHub",
-        "app_id": 15760,
-        "instance_id": 1006,
-        "audit_source": "GitHub",
-        "actions": [
-            "git.clone",
-            "git.push",
-            "repo.access",
-            "repo.create",
-            "oauth_authorization.create",
-            "personal_access_token.create",
-        ],
-    },
-]
-
-_FILE_NAMES = [
-    "Q3_forecast.xlsx",
-    "design-spec.docx",
-    "customer_list.csv",
-    "demo-deck.pptx",
-    "build_logs.txt",
-    "release-notes.md",
-    "contract_v3.pdf",
-    "audit_export.zip",
-]
-_MAIL_SUBJECTS = [
-    "Re: Q3 numbers",
-    "FW: NDA draft",
-    "Weekly status",
-    "Action required: account review",
-    "Calendar invite: planning sync",
-]
-
 
 def _activity_objects(
     action: str, user: User, world: World
@@ -137,7 +26,7 @@ def _activity_objects(
         )
     ):
         object_type = "File"
-        object_name = random.choice(_FILE_NAMES)
+        object_name = random.choice(world.cloud_app_file_names)
         object_id = str(uuid.uuid4())
         return (
             object_type,
@@ -149,7 +38,7 @@ def _activity_objects(
         k in a for k in ("mail", "send", "delete", "move", "inboxrule", "set-mailbox")
     ):
         object_type = "Email"
-        object_name = random.choice(_MAIL_SUBJECTS)
+        object_name = random.choice(world.cloud_app_mail_subjects)
         object_id = f"<{uuid.uuid4()}@{world.tenant_domain}>"
         return (
             object_type,
@@ -167,9 +56,7 @@ def _activity_objects(
         )
     if any(k in a for k in ("member", "team", "channel", "collaboration_invite")):
         object_type = "Group"
-        object_name = random.choice(
-            ["Engineering", "Finance", "Sales-EMEA", "All Hands"]
-        )
+        object_name = random.choice(world.cloud_app_group_names)
         object_id = str(uuid.uuid4())
         return (
             object_type,
@@ -191,10 +78,10 @@ def _activity_objects(
 @register("CloudAppEvents")
 def generate(world: World) -> CloudAppEvents:
     user = random.choice(world.users)
-    app = random.choice(_APPS)
+    app = random.choice(world.cloud_apps)
     ip = random.choice(world.ips)
     ua = random.choice(world.user_agents)
-    action = random.choice(app["actions"])
+    action = random.choice(app.actions)
     timestamp = now_utc()
 
     is_admin_op = user.type == "Admin" and random.random() < 0.4
@@ -210,12 +97,12 @@ def generate(world: World) -> CloudAppEvents:
         "Id": str(uuid.uuid4()),
         "Operation": action,
         "OrganizationId": world.tenant_id,
-        "RecordType": app["app_id"],
+        "RecordType": app.app_id,
         "ResultStatus": "Succeeded",
         "UserKey": user.object_id,
         "UserType": 0 if user.type == "Regular" else 2,
         "Version": 1,
-        "Workload": app["name"],
+        "Workload": app.name,
         "ClientIP": ip.ip,
         "UserId": user.upn,
         "ObjectId": object_id,
@@ -230,10 +117,10 @@ def generate(world: World) -> CloudAppEvents:
         ActivityObjects=activity_objects,
         ActivityType=action,
         AdditionalFields={},
-        AppInstanceId=app["instance_id"],
-        Application=app["name"],
-        ApplicationId=app["app_id"],
-        AuditSource=app["audit_source"],
+        AppInstanceId=app.instance_id,
+        Application=app.name,
+        ApplicationId=app.app_id,
+        AuditSource=app.audit_source,
         City=ip.city,
         CountryCode=ip.country,
         DeviceType=ua.device_type,

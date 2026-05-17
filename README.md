@@ -97,7 +97,7 @@ uv run xdrgen generate --sink csv
 
 ### Profile
 
-The YAML profile is optional. Without one, every table that has a generator is emitted using the default `contoso.com` tenant fixture. With one, you can select a subset of tables and/or override fixtures (tenant id, domain, users, devices, IPs, user agents, conditional access policies, Graph API endpoint catalogue, Graph API regions, outbound network destinations, registry targets, email templates, …) so the stream looks like it came from *your* tenant.
+The YAML profile is optional. Without one, every table that has a generator is emitted using the default `contoso.com` tenant fixture. With one, you can select a subset of tables and/or override fixtures so the stream looks like it came from *your* tenant. Overridable knobs include tenant identity (tenant id, domain, on-prem AD, SID prefix), user / device / IP / user-agent / process / loaded-library / code-signing-cert pools, Entra fixtures (conditional access policies, service principals, resources, client apps, sign-in error codes), Graph API endpoint catalogue + regions + status-code distribution, every Device* ActionType pool (`DeviceEvents`, `DeviceFileEvents`, `DeviceLogonEvents`, `DeviceNetworkEvents`, `DeviceRegistryEvents`), DeviceFileEvents file templates / download hosts / sensitivity labels, DeviceLogonEvents logon types / protocols / failure reasons, DeviceNetworkInfo adapters / DNS / gateways, CloudAppEvents connectors / file / mail / group pools, Identity* action/protocol/query/risk-level pools, UrlClickEvents outcomes / workloads, email templates, post-delivery paths, and more.
 
 A fully documented example is shipped at [`profile.example.yaml`](./profile.example.yaml) — copy it and edit:
 

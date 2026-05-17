@@ -7,38 +7,6 @@ from generators.base import register
 from generators.common import now_utc
 from world import World
 
-# Weighted LogonType — Network/Interactive dominate.
-_LOGON_TYPES = [
-    ("Network", 50),
-    ("Interactive", 18),
-    ("RemoteInteractive", 12),
-    ("Service", 8),
-    ("Batch", 4),
-    ("Unlock", 4),
-    ("NetworkCleartext", 2),
-    ("CachedInteractive", 2),
-]
-_LOGON_TYPE_VALUES, _LOGON_TYPE_WEIGHTS = zip(*_LOGON_TYPES)
-
-# (protocol, destination_port, weight). Kerberos dominates a healthy AD.
-_PROTOCOLS = [
-    ("Kerberos", 88, 70),
-    ("Ntlm", 445, 22),
-    ("Ldap", 389, 4),
-    ("LdapSecure", 636, 4),
-]
-
-_FAILURE_REASONS = [
-    "WrongPassword",
-    "AccountDisabled",
-    "AccountExpired",
-    "AccountLockedOut",
-    "PasswordExpired",
-    "NoSuchUser",
-    "TimeSkew",
-    "SmartcardRequired",
-]
-
 
 @register("IdentityLogonEvents")
 def generate(world: World) -> IdentityLogonEvents:
@@ -51,19 +19,24 @@ def generate(world: World) -> IdentityLogonEvents:
     success = random.random() < 0.92
     action_type = "LogonSuccess" if success else "LogonFailed"
 
-    logon_type = random.choices(_LOGON_TYPE_VALUES, weights=_LOGON_TYPE_WEIGHTS, k=1)[0]
-
-    # Service / Batch logons go via Kerberos TGT.
-    if logon_type in ("Service", "Batch"):
-        protocol_choices = [p for p in _PROTOCOLS if p[0] == "Kerberos"]
-    else:
-        protocol_choices = _PROTOCOLS
-    protocol_values, protocol_ports, protocol_weights = zip(*protocol_choices)
-    proto_idx = random.choices(
-        range(len(protocol_values)), weights=protocol_weights, k=1
+    logon_type = random.choices(
+        [t.logon_type for t in world.identity_logon_types],
+        weights=[t.weight for t in world.identity_logon_types],
+        k=1,
     )[0]
-    protocol = protocol_values[proto_idx]
-    destination_port = protocol_ports[proto_idx]
+
+    # Service / Batch logons go via Kerberos TGT (when available).
+    if logon_type in ("Service", "Batch"):
+        protocol_choices = [
+            p for p in world.identity_logon_protocols if p.protocol == "Kerberos"
+        ] or list(world.identity_logon_protocols)
+    else:
+        protocol_choices = list(world.identity_logon_protocols)
+    picked_protocol = random.choices(
+        protocol_choices, weights=[p.weight for p in protocol_choices], k=1
+    )[0]
+    protocol = picked_protocol.protocol
+    destination_port = picked_protocol.port
 
     sid = (
         f"{world.on_prem_sid_prefix}-{user.sid_rid}"
@@ -86,7 +59,9 @@ def generate(world: World) -> IdentityLogonEvents:
         DestinationPort=str(destination_port),
         DeviceName=user.device_name,
         DeviceType="Server" if logon_type == "Service" else ua.device_type,
-        FailureReason=random.choice(_FAILURE_REASONS) if not success else None,
+        FailureReason=(
+            random.choice(world.identity_logon_failure_reasons) if not success else None
+        ),
         IPAddress=ip.ip,
         ISP=ip.isp,
         LastSeenForUser={

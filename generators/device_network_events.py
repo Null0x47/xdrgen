@@ -12,19 +12,6 @@ from generators.device_common import (
 from models import DeviceNetworkEvents
 from world import World
 
-# Weighted ActionType — outbound success dominates; rest is failures + inbound.
-_ACTION_TYPES = [
-    ("ConnectionSuccess", 60),
-    ("ConnectionFailed", 8),
-    ("ConnectionAttempt", 6),
-    ("ConnectionRequest", 4),
-    ("InboundConnectionAccepted", 6),
-    ("ListeningConnectionCreated", 4),
-    ("DnsConnectionInspected", 8),
-    ("ConnectionFound", 4),
-]
-_ACTION_VALUES, _ACTION_WEIGHTS = zip(*_ACTION_TYPES)
-
 
 def _ip_type(ip: str) -> str:
     if ip.startswith(("10.", "192.168.", "172.16.", "172.17.")):
@@ -40,7 +27,11 @@ def generate(world: World) -> DeviceNetworkEvents:
     user = pick_user_for_device(world, device)
     remote_ip_entry = random.choice(world.ips)
 
-    action_type = random.choices(_ACTION_VALUES, weights=_ACTION_WEIGHTS, k=1)[0]
+    action_type = random.choices(
+        [a.action for a in world.device_network_action_types],
+        weights=[a.weight for a in world.device_network_action_types],
+        k=1,
+    )[0]
     destination = random.choice(world.network_destinations)
     remote_port, remote_url = destination.port, destination.url
     protocol = "Udp" if remote_port == 53 else "Tcp"

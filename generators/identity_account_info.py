@@ -9,8 +9,6 @@ from generators.base import register
 from generators.common import now_utc
 from world import World
 
-_AUTH_METHODS = ["Credentials", "Federated", "Hybrid"]
-
 
 def _source_providers(world: World) -> list[tuple[str, str, str]]:
     """Identity providers Defender ingests profile data from."""
@@ -21,15 +19,6 @@ def _source_providers(world: World) -> list[tuple[str, str, str]]:
     ]
 
 
-_DEFENDER_RISK_LEVELS = [
-    (0, 80),  # None
-    (1, 12),  # Low
-    (2, 6),  # Medium
-    (3, 2),  # High
-]
-_RISK_VALUES, _RISK_WEIGHTS = zip(*_DEFENDER_RISK_LEVELS)
-
-
 @register("IdentityAccountInfo")
 def generate(world: World) -> IdentityAccountInfo:
     user = random.choice(world.users)
@@ -38,7 +27,11 @@ def generate(world: World) -> IdentityAccountInfo:
     )
     timestamp = now_utc()
 
-    risk_level = random.choices(_RISK_VALUES, weights=_RISK_WEIGHTS, k=1)[0]
+    risk_level = random.choices(
+        [r.level for r in world.identity_risk_levels],
+        weights=[r.weight for r in world.identity_risk_levels],
+        k=1,
+    )[0]
     is_admin = user.type == "Admin"
     is_service = user.type == "Application"
     is_guest = "#EXT#" in user.upn
@@ -124,7 +117,7 @@ def generate(world: World) -> IdentityAccountInfo:
         SourceProvider=provider,
         SourceProviderInstanceId=provider_instance_id,
         SourceProviderInstanceDisplayName=provider_display,
-        AuthenticationMethod=random.choice(_AUTH_METHODS),
+        AuthenticationMethod=random.choice(world.identity_auth_methods),
         AuthenticationSourceAcccountId=None,
         EnrolledMfas=enrolled_mfas,
         LastPasswordChangeTime=last_pwd_change,
