@@ -401,3 +401,46 @@ overrides:
         - url: https://northwind-update.io/verify?u=sam.rivera
           domain: northwind-update.io
           location: Body
+
+  # File templates feeding DeviceFileEvents. `{user}` is rendered to the
+  # picked user's sam_account_name. `kind` ∈ {download, doc, temp, share}:
+  # `download` populates FileOrigin*, `share` routes through SMB semantics
+  # (UNC FolderPath, ShareName, Request* block on NetworkShare* actions).
+  file_templates:
+    - folder_template: 'C:\Users\{user}\Downloads'
+      file_name: northwind-invoice-2026.pdf
+      kind: download
+    - folder_template: 'C:\Users\{user}\Documents'
+      file_name: Q4-forecast.xlsx
+      kind: doc
+    - folder_template: '\\nw-fs01\Shared\Finance'
+      file_name: ledger-2026.xlsx
+      kind: share
+
+  # DeviceFileEvents ActionType distribution. NetworkShare* actions are
+  # routed exclusively to UNC `share` templates regardless of weighting.
+  file_action_types:
+    - action: FileCreated
+      weight: 50
+    - action: FileModified
+      weight: 25
+    - action: FileRenamed
+      weight: 15
+    - action: FileDeleted
+      weight: 10
+
+  # Pool of (label, sublabel) pairs DeviceFileEvents picks from for randomly
+  # labelled local Office docs. HR / Finance share paths still get an
+  # auto-applied "Highly Confidential" label regardless of this pool.
+  file_sensitivity_labels:
+    - label: Northwind General
+    - label: Northwind Confidential
+      sublabel: All Staff
+    - label: Northwind Highly Confidential
+      sublabel: Finance
+
+  # Hosts DeviceFileEvents uses to render FileOriginUrl / FileOriginReferrerUrl
+  # for browser-downloaded files.
+  file_download_hosts:
+    - files.northwind.com
+    - downloads.northwind-supplier.com

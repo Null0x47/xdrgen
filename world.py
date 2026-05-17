@@ -162,6 +162,46 @@ class RegistryTarget(BaseModel):
     value_type: str  # REG_SZ | REG_DWORD | REG_BINARY | …
 
 
+class FileTemplate(BaseModel):
+    """One file template feeding DeviceFileEvents.
+
+    `folder_template` may include `{user}` — rendered at emit time with the
+    picked user's `sam_account_name`. `kind` ∈ {download, doc, temp, share}
+    drives row shape: `download` populates `FileOrigin*` fields, `share`
+    routes through SMB-share semantics (UNC path, `Request*` block)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    folder_template: str
+    file_name: str
+    kind: str  # download | doc | temp | share
+
+
+class FileActionType(BaseModel):
+    """Weighted DeviceFileEvents ActionType.
+
+    `NetworkShare*` actions are routed to UNC `share` templates regardless
+    of distribution; other actions land on any template."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    action: str
+    weight: int
+
+
+class SensitivityLabel(BaseModel):
+    """Label / sublabel pair for DeviceFileEvents.SensitivityLabel.
+
+    Generator-level path heuristics (HR / Finance share folders) take
+    precedence over this pool; the pool is the fallback for randomly
+    labelled local Office documents."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    label: str
+    sublabel: Optional[str] = None
+
+
 class NetworkDestination(BaseModel):
     """Outbound destination pool for DeviceNetworkEvents.
 
@@ -1417,6 +1457,134 @@ _DEFAULT_REGISTRY_TARGETS: tuple[RegistryTarget, ...] = (
 )
 
 
+# File templates feeding DeviceFileEvents. `{user}` is rendered to the picked
+# user's sam_account_name. UNC folders surface as ShareName + Request* on
+# NetworkShare* actions.
+_DEFAULT_FILE_TEMPLATES: tuple[FileTemplate, ...] = (
+    # Browser downloads — carry FileOrigin* fields.
+    FileTemplate(
+        folder_template=r"C:\Users\{user}\Downloads",
+        file_name="invoice-2026-Q1.pdf",
+        kind="download",
+    ),
+    FileTemplate(
+        folder_template=r"C:\Users\{user}\Downloads",
+        file_name="purchase-order.pdf",
+        kind="download",
+    ),
+    FileTemplate(
+        folder_template=r"C:\Users\{user}\Downloads",
+        file_name="setup.exe",
+        kind="download",
+    ),
+    FileTemplate(
+        folder_template=r"C:\Users\{user}\Downloads",
+        file_name="vpn-installer.msi",
+        kind="download",
+    ),
+    FileTemplate(
+        folder_template=r"C:\Users\{user}\Downloads",
+        file_name="report.xlsx",
+        kind="download",
+    ),
+    FileTemplate(
+        folder_template=r"C:\Users\{user}\Downloads",
+        file_name="presentation.pptx",
+        kind="download",
+    ),
+    FileTemplate(
+        folder_template=r"C:\Users\{user}\Downloads",
+        file_name="screenshot.png",
+        kind="download",
+    ),
+    # Locally produced documents — no FileOrigin*.
+    FileTemplate(
+        folder_template=r"C:\Users\{user}\Documents",
+        file_name="meeting-minutes.docx",
+        kind="doc",
+    ),
+    FileTemplate(
+        folder_template=r"C:\Users\{user}\Documents",
+        file_name="expenses.xlsx",
+        kind="doc",
+    ),
+    FileTemplate(
+        folder_template=r"C:\Users\{user}\Desktop",
+        file_name="todo.txt",
+        kind="doc",
+    ),
+    # Temp / cache — high-volume, no origin metadata.
+    FileTemplate(
+        folder_template=r"C:\Users\{user}\AppData\Local\Temp",
+        file_name="tmp1A2B.tmp",
+        kind="temp",
+    ),
+    FileTemplate(
+        folder_template=r"C:\Users\{user}\AppData\Local\Microsoft\Outlook",
+        file_name="Outlook.ost",
+        kind="temp",
+    ),
+    FileTemplate(
+        folder_template=r"C:\Windows\Temp",
+        file_name="WERE6A9.tmp",
+        kind="temp",
+    ),
+    FileTemplate(
+        folder_template=r"C:\ProgramData\Microsoft\Windows Defender\Scans",
+        file_name="MpCacheStore.bin",
+        kind="temp",
+    ),
+    # SMB shares — UNC paths populate ShareName + Request* on share actions.
+    FileTemplate(
+        folder_template=r"\\fileserver01\Shared\HR",
+        file_name="employee-policy.pdf",
+        kind="share",
+    ),
+    FileTemplate(
+        folder_template=r"\\fileserver01\Shared\Finance",
+        file_name="Q4-budget.xlsx",
+        kind="share",
+    ),
+    FileTemplate(
+        folder_template=r"\\fileserver01\Shared\Engineering",
+        file_name="design-spec.docx",
+        kind="share",
+    ),
+)
+
+
+# DeviceFileEvents ActionType distribution — FileCreated/FileModified dominate.
+_DEFAULT_FILE_ACTION_TYPES: tuple[FileActionType, ...] = (
+    FileActionType(action="FileCreated", weight=45),
+    FileActionType(action="FileModified", weight=25),
+    FileActionType(action="FileDeleted", weight=15),
+    FileActionType(action="FileRenamed", weight=10),
+    FileActionType(action="FileShredded", weight=2),
+    FileActionType(action="NetworkShareFileSynchronized", weight=3),
+)
+
+
+# Pool of (label, sublabel) pairs DeviceFileEvents picks from for randomly
+# labelled local Office documents. HR / Finance share paths are still
+# auto-classified by the generator regardless of this pool.
+_DEFAULT_FILE_SENSITIVITY_LABELS: tuple[SensitivityLabel, ...] = (
+    SensitivityLabel(label="General"),
+    SensitivityLabel(label="Confidential", sublabel="All Employees"),
+    SensitivityLabel(label="Highly Confidential", sublabel="Finance"),
+    SensitivityLabel(label="Highly Confidential", sublabel="HR"),
+)
+
+
+# Hosts DeviceFileEvents uses to render `FileOriginUrl` / `FileOriginReferrerUrl`
+# for downloaded files.
+_DEFAULT_FILE_DOWNLOAD_HOSTS: tuple[str, ...] = (
+    "files.contoso.com",
+    "cdn.example.com",
+    "downloads.example.net",
+    "share.acme-files.example.com",
+)
+
+
 # Outbound (port, url) pairs feeding DeviceNetworkEvents.{RemotePort,RemoteUrl}.
 # `url=None` is used for ports unrelated to a hostname.
 _DEFAULT_NETWORK_DESTINATIONS: tuple[NetworkDestination, ...] = (
@@ -1491,6 +1659,12 @@ class World(BaseModel):
     graph_api_locations: tuple[str, ...] = _DEFAULT_GRAPH_API_LOCATIONS
     network_destinations: tuple[NetworkDestination, ...] = _DEFAULT_NETWORK_DESTINATIONS
     registry_targets: tuple[RegistryTarget, ...] = _DEFAULT_REGISTRY_TARGETS
+    file_templates: tuple[FileTemplate, ...] = _DEFAULT_FILE_TEMPLATES
+    file_action_types: tuple[FileActionType, ...] = _DEFAULT_FILE_ACTION_TYPES
+    file_sensitivity_labels: tuple[SensitivityLabel, ...] = (
+        _DEFAULT_FILE_SENSITIVITY_LABELS
+    )
+    file_download_hosts: tuple[str, ...] = _DEFAULT_FILE_DOWNLOAD_HOSTS
     conditional_access_policies: tuple[ConditionalAccessPolicy, ...] = (
         _DEFAULT_CA_POLICIES
     )
@@ -1528,6 +1702,10 @@ class Overrides(BaseModel):
     graph_api_locations: Optional[list[str]] = None
     network_destinations: Optional[list[NetworkDestination]] = None
     registry_targets: Optional[list[RegistryTarget]] = None
+    file_templates: Optional[list[FileTemplate]] = None
+    file_action_types: Optional[list[FileActionType]] = None
+    file_sensitivity_labels: Optional[list[SensitivityLabel]] = None
+    file_download_hosts: Optional[list[str]] = None
     conditional_access_policies: Optional[list[ConditionalAccessPolicy]] = None
     entra_sign_in_error_codes: Optional[list[WeightedErrorCode]] = None
     entra_spn_sign_in_error_codes: Optional[list[WeightedErrorCode]] = None

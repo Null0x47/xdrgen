@@ -137,7 +137,7 @@ For an in-browser KQL editor that queries the local Kustainer instance (Monaco-K
 
 ### Supported tables
 
-Handcrafted generators currently exist for: `CloudAppEvents`, `DeviceEvents`, `DeviceFileCertificateInfo`, `DeviceImageLoadEvents`, `DeviceLogonEvents`, `DeviceNetworkEvents`, `DeviceNetworkInfo`, `DeviceProcessEvents`, `DeviceRegistryEvents`, `EmailAttachmentInfo`, `EmailEvents`, `EmailPostDeliveryEvents`, `EmailUrlInfo`, `EntraIdSignInEvents`, `EntraIdSpnSignInEvents`, `GraphApiAuditEvents`, `IdentityAccountInfo`, `IdentityDirectoryEvents`, `IdentityEvents`, `IdentityLogonEvents`, `IdentityQueryEvents`, `UrlClickEvents`.
+Handcrafted generators currently exist for: `CloudAppEvents`, `DeviceEvents`, `DeviceFileCertificateInfo`, `DeviceFileEvents`, `DeviceImageLoadEvents`, `DeviceLogonEvents`, `DeviceNetworkEvents`, `DeviceNetworkInfo`, `DeviceProcessEvents`, `DeviceRegistryEvents`, `EmailAttachmentInfo`, `EmailEvents`, `EmailPostDeliveryEvents`, `EmailUrlInfo`, `EntraIdSignInEvents`, `EntraIdSpnSignInEvents`, `GraphApiAuditEvents`, `IdentityAccountInfo`, `IdentityDirectoryEvents`, `IdentityEvents`, `IdentityLogonEvents`, `IdentityQueryEvents`, `UrlClickEvents`.
 
 Per-table specifics live in [`generators/PRODUCTION_LIKE_DATA.md`](./generators/PRODUCTION_LIKE_DATA.md). Listing an unsupported table in a profile fails fast with the available list.
 

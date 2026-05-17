@@ -8,6 +8,7 @@ from models import (
     CloudAppEvents,
     DeviceEvents,
     DeviceFileCertificateInfo,
+    DeviceFileEvents,
     DeviceImageLoadEvents,
     DeviceLogonEvents,
     DeviceNetworkEvents,
@@ -34,6 +35,7 @@ from generators.device_events import generate as generate_device_events
 from generators.device_file_certificate_info import (
     generate as generate_device_cert,
 )
+from generators.device_file_events import generate as generate_device_file
 from generators.device_image_load_events import (
     generate as generate_device_image_load,
 )
@@ -115,6 +117,7 @@ def test_generators_registry_lists_every_supported_table():
         "CloudAppEvents",
         "DeviceEvents",
         "DeviceFileCertificateInfo",
+        "DeviceFileEvents",
         "DeviceImageLoadEvents",
         "DeviceLogonEvents",
         "DeviceNetworkEvents",
@@ -1139,6 +1142,112 @@ def test_device_events_round_trips_through_model(_world):
 
     assert isinstance(event, DeviceEvents)
     DeviceEvents.model_validate_json(event.model_dump_json(by_alias=True))
+
+
+def test_device_file_events_round_trips_through_model(_world):
+    event = generate_device_file(_world)
+
+    assert isinstance(event, DeviceFileEvents)
+    DeviceFileEvents.model_validate_json(event.model_dump_json(by_alias=True))
+
+
+def test_device_file_events_share_actions_populate_request_block(_world):
+    """NetworkShare* actions populate Request* + ShareName; local actions don't."""
+    saw_share = saw_local = False
+    for _ in range(500):
+        event = generate_device_file(_world)
+        if event.ActionType.startswith("NetworkShare"):
+            saw_share = True
+            assert event.ShareName is not None
+            assert event.RequestProtocol == "SMB"
+            assert event.RequestSourceIP is not None
+            assert event.RequestSourcePort is not None
+            assert event.FolderPath.startswith("\\\\")
+        else:
+            saw_local = True
+            assert event.RequestProtocol is None
+            assert event.RequestSourceIP is None
+    assert saw_share, "expected at least one NetworkShare* action in 500 samples"
+    assert saw_local, "expected at least one local file action in 500 samples"
+
+
+def test_device_file_events_rename_populates_previous_fields(_world):
+    """FileRenamed is the only action that fills PreviousFileName / PreviousFolderPath."""
+    saw_rename = False
+    for _ in range(500):
+        event = generate_device_file(_world)
+        if event.ActionType == "FileRenamed":
+            saw_rename = True
+            assert event.PreviousFileName is not None
+            assert event.PreviousFolderPath is not None
+            assert event.PreviousFolderPath.endswith(event.PreviousFileName)
+        else:
+            assert event.PreviousFileName is None
+            assert event.PreviousFolderPath is None
+    assert saw_rename, "expected at least one FileRenamed in 500 samples"
+
+
+def test_device_file_events_honors_profile_overrides():
+    """Profile overrides for templates/actions/labels/hosts flow into rows."""
+    from world import (
+        FileActionType,
+        FileTemplate,
+        Overrides,
+        Profile,
+        SensitivityLabel,
+    )
+
+    prof = Profile(
+        tables=["DeviceFileEvents"],
+        overrides=Overrides(
+            file_templates=[
+                FileTemplate(
+                    folder_template=r"C:\Lab\{user}",
+                    file_name="lab-only.docx",
+                    kind="doc",
+                ),
+                FileTemplate(
+                    folder_template=r"\\labshare\Drop",
+                    file_name="payload.bin",
+                    kind="share",
+                ),
+            ],
+            file_action_types=[
+                FileActionType(action="FileCreated", weight=1),
+                FileActionType(action="NetworkShareFileSynchronized", weight=1),
+            ],
+            file_sensitivity_labels=[SensitivityLabel(label="Lab-Only")],
+            file_download_hosts=["lab.northwind.test"],
+        ),
+    )
+    world = prof.build_world()
+
+    seen_files = set()
+    seen_actions = set()
+    for _ in range(200):
+        event = generate_device_file(world)
+        seen_files.add(event.FileName)
+        seen_actions.add(event.ActionType)
+        assert event.FileName in {"lab-only.docx", "payload.bin"}
+        assert event.ActionType in {"FileCreated", "NetworkShareFileSynchronized"}
+        if event.SensitivityLabel is not None:
+            assert event.SensitivityLabel == "Lab-Only"
+    assert seen_files == {"lab-only.docx", "payload.bin"}
+    assert seen_actions == {"FileCreated", "NetworkShareFileSynchronized"}
+
+
+def test_device_file_events_download_origin_only_on_file_created(_world):
+    """FileOrigin* is only set for browser-downloaded files freshly created."""
+    saw_origin = False
+    for _ in range(500):
+        event = generate_device_file(_world)
+        if event.FileOriginUrl is not None:
+            saw_origin = True
+            assert event.ActionType == "FileCreated"
+            assert event.FileOriginIP is not None
+            assert event.FileOriginReferrerUrl is not None
+            assert "Downloads" in event.FolderPath
+    assert saw_origin, "expected at least one download-origin row in 500 samples"
 
 
 def test_device_file_certificate_info_round_trips_through_model(_world):
