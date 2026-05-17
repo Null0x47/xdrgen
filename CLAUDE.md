@@ -32,9 +32,9 @@ uv run pytest -q
 
 * Make sure to always write unit tests in the tests folder for new features
 * Make sure to always update the README.md with changes for the end user
-* All telemetry generators should produce production worthy data, not just random fake values. Consult the microsoft documentation if you are not sure what value a field should have
+* All telemetry generators, if not overridden in a profile, should produce production worthy data, not just random fake values. Consult the microsoft documentation if you are not sure what value a field should have
 * Keep comments short and to the point
 * Do not add redundant section devider comments
-* Always format Python source
+* Always format Python source except files in `/generators`
 * Always lint Python source with `ruff check --fix` to auto-apply safe fixes
 * Always update the `generate --help` output in README.md if something changes in the CLI
