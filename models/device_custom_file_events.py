@@ -40,6 +40,7 @@ class DeviceCustomFileEvents(BaseModel):
     InitiatingProcessSHA1: Optional[str] = Field(None, description="SHA-1 hash of the process (image file) that initiated the event.")
     InitiatingProcessSHA256: Optional[str] = Field(None, description="SHA-256 hash of the process (image file) that initiated the event. This field is usually not populated - use the SHA1 column when available.")
     InitiatingProcessTokenElevation: Optional[str] = Field(None, description="Token type indicating the presence or absence of User Access Control (UAC) privilege elevation applied to the process that initiated the event.")
+    InitiatingProcessUniqueId: Optional[str] = Field(None, description="Unique identifier of the initiating process; this is equal to the Process Start Key in Windows devices.")
     InitiatingProcessVersionInfoCompanyName: Optional[str] = Field(None, description="Company name from the version information of the process (image file) responsible for the event.")
     InitiatingProcessVersionInfoFileDescription: Optional[str] = Field(None, description="Description from the version information of the process (image file) responsible for the event.")
     InitiatingProcessVersionInfoInternalFileName: Optional[str] = Field(None, description="Internal file name from the version information of the process (image file) responsible for the event.")

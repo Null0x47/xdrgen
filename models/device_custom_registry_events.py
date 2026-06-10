@@ -1,14 +1,12 @@
 from datetime import datetime
-from typing import Any
 from typing import Optional
 
 from pydantic import BaseModel, Field
 
 
-class DeviceCustomNetworkEvents(BaseModel):
+class DeviceCustomRegistryEvents(BaseModel):
     Timestamp: Optional[datetime] = Field(None, description="Date and time when the event was recorded")
     ActionType: Optional[str] = Field(None, description="Type of activity that triggered the event.")
-    AdditionalFields: Optional[Any] = Field(None, description="Additional information about the entity or event.")
     AppGuardContainerId: Optional[str] = Field(None, description="Identifier for the virtualized container used by Application Guard to isolate browser activity.")
     DeviceId: Optional[str] = Field(None, description="Unique identifier for the device in the service.")
     DeviceName: Optional[str] = Field(None, description="Fully qualified domain name (FQDN) of the device.")
@@ -20,7 +18,7 @@ class DeviceCustomNetworkEvents(BaseModel):
     InitiatingProcessCommandLine: Optional[str] = Field(None, description="Command line used to run the initiating process.")
     InitiatingProcessCreationTime: Optional[datetime] = Field(None, description="Date and time when the process that initiated the event was started.")
     InitiatingProcessFileName: Optional[str] = Field(None, description="Name of the initiating process.")
-    InitiatingProcessFileSize: Optional[int] = Field(None, description="Size of the file (bytes) that ran the process responsible for the event.")
+    InitiatingProcessFileSize: Optional[int] = Field(None, description="The size of the file (bytes) that ran the process responsible for the event.")
     InitiatingProcessFolderPath: Optional[str] = Field(None, description="Folder containing the initiating process (image file).")
     InitiatingProcessId: Optional[int] = Field(None, description="Process ID (PID) of the initiating process.")
     InitiatingProcessIntegrityLevel: Optional[str] = Field(None, description="Integrity level of the initiating process. Windows assigns integrity levels to processes based on certain characteristics, such as if they were launched from an internet download. These integrity levels influence permissions to resources..")
@@ -42,15 +40,14 @@ class DeviceCustomNetworkEvents(BaseModel):
     InitiatingProcessVersionInfoProductName: Optional[str] = Field(None, description="The product name in version information (image file) responsible for the event.")
     InitiatingProcessVersionInfoProductVersion: Optional[str] = Field(None, description="The product version in version information (image file) responsible for the event.")
     IsInitiatingProcessRemoteSession: Optional[bool] = Field(None, description="Indicates whether the initiating process was run under a remote desktop protocol (RDP) session (true) or locally (false).")
-    LocalIP: Optional[str] = Field(None, description="IP address assigned to the local machine used during communication.")
-    LocalIPType: Optional[str] = Field(None, description="Type of IP address, for example Public, Private, Reserved, Loopback, Teredo, FourToSixMapping, and Broadcast.")
-    LocalPort: Optional[int] = Field(None, description="TCP port on the local machine used during communication.")
     MachineGroup: Optional[str] = Field(None, description="Machine group of the machine. This group is used by role-based access control to determine access to the machine.")
-    Protocol: Optional[str] = Field(None, description="IP protocol used, whether TCP or UDP.")
-    RemoteIP: Optional[str] = Field(None, description="IP address that was being connected to.")
-    RemoteIPType: Optional[str] = Field(None, description="Type of IP address, for example Public, Private, Reserved, Loopback, Teredo, FourToSixMapping, and Broadcast.")
-    RemotePort: Optional[int] = Field(None, description="TCP port on the remote device that was being connected to.")
-    RemoteUrl: Optional[str] = Field(None, description="URL or fully qualified domain name (FQDN) that was being connected to.")
+    PreviousRegistryKey: Optional[str] = Field(None, description="Original registry key before it was modified.")
+    PreviousRegistryValueData: Optional[str] = Field(None, description="Original data of the registry value before it was modified.")
+    PreviousRegistryValueName: Optional[str] = Field(None, description="Original name of the registry value before it was modified.")
+    RegistryKey: Optional[str] = Field(None, description="Registry key that the recorded action was applied to.")
+    RegistryValueData: Optional[str] = Field(None, description="Data of the registry value that the recorded action was applied to.")
+    RegistryValueName: Optional[str] = Field(None, description="Name of the registry value that the recorded action was applied to.")
+    RegistryValueType: Optional[str] = Field(None, description="Data type, such as binary or string, of the registry value that the recorded action was applied to.")
     ReportId: Optional[int] = Field(None, description="Event identifier based on a repeating counter. To identify unique events, this column must be used in conjunction with the ComputerName and EventTime columns..")
     RuleLastModificationTime: Optional[datetime] = Field(None, description="Date and time when the rule that collected the event was last modified.")
     RuleName: Optional[str] = Field(None, description="Name of the rule that collected the event")

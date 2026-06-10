@@ -1,4 +1,5 @@
 from .ai_agents_info import AIAgentsInfo
+from .agents_info import AgentsInfo
 from .behavior_entities import BehaviorEntities
 from .behavior_info import BehaviorInfo
 from .campaign_info import CampaignInfo
@@ -24,6 +25,7 @@ from .device_custom_file_events import DeviceCustomFileEvents
 from .device_custom_image_load_events import DeviceCustomImageLoadEvents
 from .device_custom_network_events import DeviceCustomNetworkEvents
 from .device_custom_process_events import DeviceCustomProcessEvents
+from .device_custom_registry_events import DeviceCustomRegistryEvents
 from .device_custom_script_events import DeviceCustomScriptEvents
 from .device_etw import DeviceEtw
 from .device_events import DeviceEvents
@@ -77,6 +79,7 @@ from .url_click_events import UrlClickEvents
 
 __all__ = [
     "AIAgentsInfo",
+    "AgentsInfo",
     "BehaviorEntities",
     "BehaviorInfo",
     "CampaignInfo",
@@ -102,6 +105,7 @@ __all__ = [
     "DeviceCustomImageLoadEvents",
     "DeviceCustomNetworkEvents",
     "DeviceCustomProcessEvents",
+    "DeviceCustomRegistryEvents",
     "DeviceCustomScriptEvents",
     "DeviceEtw",
     "DeviceEvents",
